@@ -1,0 +1,40 @@
+# Secrets — never commit these
+.env
+.env.local
+.env.*.local
+*.pem
+samconfig.toml
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+build/
+.vite/
+.aws-sam/
+
+# Vercel
+.vercel
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Demo fallback assets (large, machine-local)
+demo-assets/*.mp4
+demo-assets/*.mov

@@ -1,0 +1,257 @@
+@import "tailwindcss";
+
+/**
+ * Design tokens. These mirror `lib/chartTheme.ts` exactly — the charts and the
+ * chrome around them are one system, so a card and the chart inside it never
+ * disagree about what "muted" means.
+ *
+ * Dark mode is SELECTED, not flipped: the eight series hues are re-stepped for
+ * a dark surface and validated against it (worst adjacent CVD ΔE 8.4, worst
+ * normal-vision ΔE 19.3, all five sub-score slots ≥ 3:1 on #1a1a19). Inverting
+ * the light steps would have produced a palette nobody checked.
+ *
+ * The dark block is written twice on purpose: the media query covers the OS
+ * setting, the [data-theme] scope covers the in-app toggle, and the
+ * :not([data-theme="light"]) guard lets an explicit light choice beat OS dark.
+ */
+
+/* `static` because the series and band variables are consumed through var()
+   in inline styles and by Chart.js, not by generated utility classes — without
+   it Tailwind tree-shakes them out and every series colour resolves to
+   transparent. */
+@theme static {
+  /* ── chrome, light ── */
+  --color-plane: #f9f9f7;
+  --color-surface: #fcfcfb;
+  --color-ink: #0b0b0b;
+  --color-ink2: #52514e;
+  /* The reference palette's muted step (#898781) is specified for chart axis
+     labels; as UI helper text on a light surface it only reaches 3.5:1. This
+     step is darkened to clear 4.5:1 on surface, plane and every status wash.
+     Dark mode keeps #898781, which already clears 4.85:1 there. */
+  --color-muted: #6e6c65;
+  --color-hairline: #e1e0d9;
+  --color-rule: #c3c2b7;
+
+  /* ── status: fixed in both modes, never themed, never a series colour ── */
+  --color-good: #0ca30c;
+  --color-warning: #fab219;
+  --color-serious: #ec835a;
+  --color-critical: #d03b3b;
+
+  /* ── status washes ── */
+  --color-goodtint: #eaf6ea;
+  --color-warntint: #fdf1d9;
+  --color-crittint: #fae3e3;
+
+  /* Status colours are tuned for FILLS. As text they miss 4.5:1 — warning and
+     serious badly — so text gets its own steps, re-picked per mode. */
+  --color-goodtext: #006300;
+  --color-warntext: #7a5200;
+  --color-serioustext: #9a4a22;
+  --color-crittext: #a62b2b;
+
+  /* ── categorical series, light steps ── */
+  --color-series-1: #2a78d6;
+  --color-series-2: #eb6834;
+  --color-series-3: #1baf7a;
+  --color-series-4: #eda100;
+  --color-series-5: #e87ba4;
+  --color-series-6: #008300;
+  --color-series-7: #4a3aa7;
+  --color-series-8: #e34948;
+
+  /* ── UC-018 load bands ── */
+  --color-band-light: #eaf6ea;
+  --color-band-moderate: #f3f4ee;
+  --color-band-busy: #fdf1d9;
+  --color-band-crash: #fae3e3;
+  --color-band-unavailable: #f0efec;
+
+  --radius-card: 14px;
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Defined here rather than inline: an arbitrary shadow containing rgba()
+     commas does not survive Tailwind's class parser. */
+  --shadow-card: 0 1px 2px rgba(11, 11, 11, 0.04), 0 10px 28px -14px rgba(11, 11, 11, 0.16);
+  --shadow-lift: 0 1px 2px rgba(11, 11, 11, 0.05);
+}
+
+:root {
+  color-scheme: light;
+  --hatch-ink: rgba(11, 11, 11, 0.09);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --hatch-ink: rgba(255, 255, 255, 0.10);
+
+    --color-plane: #0d0d0d;
+    --color-surface: #1a1a19;
+    --color-ink: #ffffff;
+    --color-ink2: #c3c2b7;
+    --color-muted: #898781;
+    --color-hairline: #2c2c2a;
+    --color-rule: #383835;
+
+    --color-goodtint: #10240f;
+    --color-warntint: #2b2108;
+    --color-crittint: #2c1414;
+
+    --color-goodtext: #5fd35f;
+    --color-warntext: #f5c65c;
+    --color-serioustext: #f0a077;
+    --color-crittext: #f2a0a0;
+
+    --color-series-1: #3987e5;
+    --color-series-2: #d95926;
+    --color-series-3: #199e70;
+    --color-series-4: #c98500;
+    --color-series-5: #d55181;
+    --color-series-6: #008300;
+    --color-series-7: #9085e9;
+    --color-series-8: #e66767;
+
+    --color-band-light: #12250f;
+    --color-band-moderate: #222220;
+    --color-band-busy: #2e2409;
+    --color-band-crash: #2f1616;
+    --color-band-unavailable: #202020;
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 28px -14px rgba(0, 0, 0, 0.7);
+    --shadow-lift: 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --hatch-ink: rgba(255, 255, 255, 0.10);
+
+  --color-plane: #0d0d0d;
+  --color-surface: #1a1a19;
+  --color-ink: #ffffff;
+  --color-ink2: #c3c2b7;
+  --color-muted: #898781;
+  --color-hairline: #2c2c2a;
+  --color-rule: #383835;
+
+  --color-goodtint: #10240f;
+  --color-warntint: #2b2108;
+  --color-crittint: #2c1414;
+
+  --color-goodtext: #5fd35f;
+  --color-warntext: #f5c65c;
+  --color-serioustext: #f0a077;
+  --color-crittext: #f2a0a0;
+
+  --color-series-1: #3987e5;
+  --color-series-2: #d95926;
+  --color-series-3: #199e70;
+  --color-series-4: #c98500;
+  --color-series-5: #d55181;
+  --color-series-6: #008300;
+  --color-series-7: #9085e9;
+  --color-series-8: #e66767;
+
+  --color-band-light: #12250f;
+  --color-band-moderate: #222220;
+  --color-band-busy: #2e2409;
+  --color-band-crash: #2f1616;
+  --color-band-unavailable: #202020;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 28px -14px rgba(0, 0, 0, 0.7);
+  --shadow-lift: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+body {
+  background-color: var(--color-plane);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Numbers that sit in columns or change in place must not jitter. */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* UC-018 E1 — a fully blocked week is hatched and labelled, never a zero. */
+.hatched {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--hatch-ink) 0,
+    var(--hatch-ink) 1.5px,
+    transparent 1.5px,
+    transparent 7px
+  );
+}
+
+/* UC-015 step 4 / UC-011 — reordering should read as movement, not a redraw. */
+@media (prefers-reduced-motion: no-preference) {
+  .reorder {
+    transition: transform 240ms cubic-bezier(0.2, 0, 0, 1),
+      opacity 240ms ease, background-color 160ms ease, border-color 160ms ease;
+  }
+  .rise {
+    animation: rise 320ms cubic-bezier(0.2, 0, 0, 1) both;
+  }
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Focus visibility, once, everywhere. */
+:where(button, a, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Range inputs: a thin recessive track with a precise handle. */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-hairline);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 999px;
+  background: var(--color-ink);
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-hairline);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--color-ink);
+  border: 2px solid var(--color-surface);
+}
+
+/* Date pickers ship a light glyph; match it to the surface. */
+:root[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
+}

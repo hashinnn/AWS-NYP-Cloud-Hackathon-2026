@@ -22,6 +22,12 @@ const DEFAULT_PREFS = {
   escalationEnabled: true,
 };
 
+/** Storage keys never go on the wire — the client has no use for them. */
+function publicPrefs(prefs) {
+  const { PK, SK, ...rest } = prefs;
+  return rest;
+}
+
 async function getPrefs(userId) {
   const result = await send(new GetCommand({
     TableName: TABLE_NAME,
@@ -60,4 +66,6 @@ function extractPrefs(items) {
   return { ...DEFAULT_PREFS, ...stored };
 }
 
-module.exports = { getPrefs, patchPrefs, scoringPrefs, extractPrefs, DEFAULT_PREFS };
+module.exports = {
+  getPrefs, patchPrefs, publicPrefs, scoringPrefs, extractPrefs, DEFAULT_PREFS,
+};

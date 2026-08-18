@@ -200,6 +200,11 @@ const routes = [
   ['POST', /^\/api\/parse\/bulk\/import$/, H('parse/bulkImport.js')],
   ['POST', /^\/api\/briefs\/extract$/, H('briefs/extract.js')],
   ['POST', /^\/api\/tasks\/([^/]+)\/progress$/, H('progress/logProgress.js'), ['taskId']],
+  // Platform & Data — Philena. Real handlers now, not the stand-ins that used
+  // to live in the request loop below.
+  ['PATCH', /^\/api\/tasks\/([^/]+)$/, H('tasks/patch.js'), ['taskId']],
+  ['GET', /^\/api\/prefs$/, H('modules-prefs/get.js')],
+  ['PUT', /^\/api\/prefs$/, H('modules-prefs/put.js')],
 ];
 
 const server = http.createServer(async (req, res) => {
@@ -230,13 +235,8 @@ const server = http.createServer(async (req, res) => {
       prefs: ITEMS.find((i) => i.SK === 'PREFS'),
     }));
   }
-  if (url.pathname === '/api/prefs') {
-    if (req.method === 'PUT') upsert('PREFS', JSON.parse(body || '{}'));
-    res.writeHead(200, cors);
-    return res.end(JSON.stringify({ prefs: ITEMS.find((i) => i.SK === 'PREFS') }));
-  }
-  // Progress logging is now the real UC-008 handler, registered in `routes`
-  // below (progress/logProgress.js) — no fake stand-in needed here any more.
+  // Prefs and progress are both real handlers now, registered in `routes`
+  // above — no fake stand-ins needed here any more.
 
   for (const [method, pattern, handler, names = []] of routes) {
     const match = url.pathname.match(pattern);

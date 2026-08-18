@@ -18,6 +18,14 @@ import ModuleChip from '../components/ModuleChip';
 const TIMER_KEY = 'deadlineiq.session';
 const IMPLAUSIBLE_HOURS = 6; // E3 — beyond this we ask rather than assume
 
+// UC-009 Alt A — the two figures whose absence forces a neutral 50, named in
+// the words the student would use for them rather than the field name.
+const DATA_GAP_HINT: Record<string, string> = {
+  effortHours: 'Add an effort estimate for a better ranking — this one is scored on an average.',
+  gradeWeight: 'Add the grade weight for a better ranking — this one is scored on an average.',
+  dueAt: 'This task needs a valid deadline before it can be ranked.',
+};
+
 type Session = { taskId: string; startedAt: number };
 
 function useTicker() {
@@ -48,6 +56,12 @@ export default function Focus() {
     setLoading(true);
     try {
       const response = await api.get('/api/focus');
+      // Every caller of load() has just changed a score, so the upgraded
+      // wording is now describing sub-scores that no longer exist. Drop it and
+      // let the effect below re-ask: a bar whose segments do not add up to the
+      // total printed beside them is the one thing this product cannot show.
+      explained.current.clear();
+      setUpgraded({});
       setData(response.data);
       setIndex(0);
       setProblem(null);
@@ -107,6 +121,24 @@ export default function Focus() {
       await Promise.all([load(), refresh()]);
     } catch (error) {
       setProblem(errorMessage(error, 'Could not log that.'));
+    }
+  }
+
+  /**
+   * UC-012 step 7 — tick the milestone the card is actually showing.
+   *
+   * The task-level "Done" would mark the whole report finished when the card
+   * says "write the literature review". The server derives progressPct from
+   * the completed milestone hours and rescores from there.
+   */
+  async function completeMilestone(milestoneId: string) {
+    try {
+      await api.patch(`/api/tasks/${task.taskId}/milestones/${milestoneId}`, {
+        completedAt: new Date().toISOString(),
+      });
+      await Promise.all([load(), refresh()]);
+    } catch (error) {
+      setProblem(errorMessage(error, 'Could not tick that step off.'));
     }
   }
 
@@ -253,6 +285,16 @@ export default function Focus() {
             />
           </div>
 
+          {/* UC-009 Alt A — the engine substituted a neutral 50 for a figure
+              the student never gave it. Say which one, and say it here, next
+              to the bar the substitution distorted. Degrading in quality is
+              only acceptable if the student is told it happened. */}
+          {task.dataGap?.length > 0 && (
+            <p className="mt-3 text-xs text-serioustext">
+              {DATA_GAP_HINT[task.dataGap[0]] || 'Fill in the missing details for a better ranking.'}
+            </p>
+          )}
+
           {progressOpen && (
             <div className="rise mt-6 rounded-xl border border-hairline bg-plane p-4">
               <label className="flex justify-between text-sm text-ink2" htmlFor="progress">
@@ -313,12 +355,16 @@ export default function Focus() {
           >
             Not now
           </button>
+          {/* UC-011 step 5 — "Done" completes whatever the card is showing:
+              the milestone when there is one, the task when there is not. */}
           <button
             type="button"
-            onClick={() => logProgress({ progressPct: 100 })}
+            onClick={() => (current.milestone
+              ? completeMilestone(current.milestone.milestoneId)
+              : logProgress({ progressPct: 100 }))}
             className="bg-surface px-3 py-3.5 text-sm text-ink2 transition hover:bg-plane hover:text-ink"
           >
-            Done
+            {current.milestone ? 'Step done' : 'Done'}
           </button>
         </div>
       </article>

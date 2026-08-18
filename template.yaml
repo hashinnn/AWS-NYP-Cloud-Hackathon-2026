@@ -259,7 +259,63 @@ Resources:
             Path: /api/tasks
             Method: post
 
-  # UC-003 / UC-004 functions land here in [P-07] and [P-08].
+  # UC-003 [P-07] — edit, archive, soft-delete and restore, all as one partial
+  # write. Returns the full ranking because a deadline change alters the
+  # ClashPenalty of tasks the student did not touch.
+  #
+  # NOTE (Hasini): written out of my track to unblock UC-018's availability
+  # control and the Intelligence views that assume an edit path exists. Yours
+  # to take back — the DELETE/restore endpoints in UC-003 steps 7-9 are still
+  # unwritten; `status` on this PATCH covers archive and soft-delete meanwhile.
+  # Least privilege: dynamodb:Query, GetItem, UpdateItem, TransactWriteItems.
+  PatchTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/tasks/patch.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        PatchTask:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/tasks/{taskId}
+            Method: patch
+
+  # UC-004 [P-08] — read the student's settings. Class A read.
+  # Least privilege: dynamodb:GetItem on the table.
+  GetPrefsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/modules-prefs/get.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        GetPrefs:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/prefs
+            Method: get
+
+  # UC-004 step 7 — availability feeds EffortPressure directly, so saving it
+  # rescores the whole active set rather than waiting for the hourly job.
+  # That is what makes the UC-018 heatmap re-shade under the student's hand.
+  #
+  # NOTE (Hasini): also written out of my track — UC-018 Alt B has no demo
+  # without it. Modules (UC-004 steps 2-3) are still unwritten and yours.
+  # Least privilege: dynamodb:Query and UpdateItem on the table.
+  PutPrefsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/modules-prefs/put.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        PutPrefs:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/prefs
+            Method: put
+
 
   # ==========================================================================
   # ===== MAHDIYA ============================================================
@@ -272,6 +328,208 @@ Resources:
   # ==========================================================================
   # UC-010 explain, UC-011 focus, UC-012 milestones, UC-013/018 workload,
   # UC-014 plan, UC-015 weights, UC-009 ranking view.
+  #
+  # Every function here loads the student's whole partition with ONE Query on
+  # PK = USER#<userId> (lib/loadRanked.js) and scores it in process. There is
+  # no Scan and no second round trip, which is what keeps the Class A reads
+  # inside their 500 ms budget.
+  #
+  # Only ExplainFunction and MilestonesGenerateFunction ever reach the model,
+  # and both are Class C with a deterministic fallback. Every other function
+  # below is a read or write path, where an LLM call would be a bug (§7).
+
+  # UC-009 — the ranking view. Class A read.
+  # Least privilege: dynamodb:Query and UpdateItem on the table.
+  RankingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/views/ranking.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        Ranking:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/ranking
+            Method: get
+
+  # UC-010 — narration. Class C: the model sits behind a 6 s timeout and the
+  # template sentence behind that, so this endpoint never returns an error.
+  #
+  # Timeout 15 s, not the 10 s default: a 6 s model call plus the partition
+  # read plus the explanation write has no headroom inside 10.
+  # Least privilege: dynamodb:Query and UpdateItem on the table.
+  ExplainFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/explain/explain.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Timeout: 15
+      Events:
+        Explain:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/explain
+            Method: post
+
+  # UC-011 — Focus Mode. Class A read: serves the cached or template sentence
+  # and never calls the model, so the card cannot block on a rate limit.
+  # Least privilege: dynamodb:Query on the table.
+  FocusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/focus/get.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        Focus:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/focus
+            Method: get
+
+  # UC-012 — the breakdown proposal. Class C, and it writes nothing: the
+  # student accepts it through MilestonesPutFunction below.
+  # Least privilege: dynamodb:GetItem and Query on the table.
+  MilestonesGenerateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/milestones/generate.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Timeout: 15
+      Events:
+        GenerateMilestones:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/tasks/{taskId}/milestones/generate
+            Method: post
+
+  # UC-012 step 6 — accept the breakdown. All or nothing.
+  # Least privilege: dynamodb:GetItem, Query, TransactWriteItems on the table.
+  MilestonesPutFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/milestones/put.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        PutMilestones:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/tasks/{taskId}/milestones
+            Method: put
+
+  # UC-012 step 7 — tick a milestone. This drives the parent's progressPct, so
+  # the full active set is rescored: ClashPenalty is cross-task.
+  # Least privilege: dynamodb:Query and UpdateItem on the table.
+  MilestonePatchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/milestones/patch.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        PatchMilestone:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/tasks/{taskId}/milestones/{id}
+            Method: patch
+
+  # UC-013 — crash weeks on their own, for callers that do not want the grid.
+  # Least privilege: dynamodb:Query on the table.
+  CrashWeeksFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/workload/crashWeeks.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        CrashWeeks:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/workload/crash-weeks
+            Method: get
+
+  # UC-013 step 6 — enact the recommendation, then rescore so the red cell
+  # visibly lightens. {weekStart} is a full ISO timestamp, percent-encoded by
+  # the browser; API Gateway decodes it once before the handler sees it.
+  # Least privilege: dynamodb:Query, TransactWriteItems, UpdateItem.
+  CrashWeekApplyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/workload/apply.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        ApplyCrashWeek:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/workload/crash-weeks/{weekStart}/apply
+            Method: post
+
+  # UC-013 step 7 — quiet that week's card for 48 hours.
+  # Least privilege: dynamodb:GetItem and UpdateItem on the PREFS item.
+  CrashWeekDismissFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/workload/dismiss.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        DismissCrashWeek:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/workload/crash-weeks/{weekStart}/dismiss
+            Method: post
+
+  # UC-018 — the 12-week heatmap. Class A read. It returns the crash weeks
+  # alongside the grid so both come from one round trip.
+  # Least privilege: dynamodb:Query on the table.
+  HeatmapFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/workload/heatmap.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        Heatmap:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/workload/heatmap
+            Method: get
+
+  # UC-014 — today's plan. Class A read: allocation arithmetic, no model call.
+  # Least privilege: dynamodb:Query on the table.
+  PlanTodayFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/plan/today.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        PlanToday:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/plan/today
+            Method: get
+
+  # UC-015 step 7 — persist the weightings the student previewed client-side.
+  # Class B write; weights are normalised to sum 1.0 before they are stored.
+  # Least privilege: dynamodb:Query and UpdateItem on the table.
+  WeightsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/weights/put.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        PutWeights:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/prefs/weights
+            Method: put
 
   # ==========================================================================
   # ===== ZOE ================================================================

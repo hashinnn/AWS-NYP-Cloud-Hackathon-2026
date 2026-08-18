@@ -29,7 +29,10 @@ exports.handler = async (event) => {
 
   const total = body.milestones.reduce((sum, m) => sum + m.hours, 0);
   const effortHours = Number(task.effortHours);
-  if (Number.isFinite(effortHours) && Math.abs(total - effortHours) > HOURS_TOLERANCE) {
+  // A task with no recorded estimate has no total to reconcile against, so
+  // there is nothing to mismatch. `> 0` rather than `isFinite` because
+  // `Number(null)` is 0 — finite, and a phantom estimate to measure against.
+  if (effortHours > 0 && Math.abs(total - effortHours) > HOURS_TOLERANCE) {
     return fail(400, 'hours_mismatch',
       `Milestone hours add up to ${Math.round(total * 10) / 10}, but the task is estimated at ${effortHours}.`);
   }

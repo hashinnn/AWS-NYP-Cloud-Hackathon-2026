@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { api, errorMessage } from '../lib/api';
+import { api, errorCode, errorMessage } from '../lib/api';
 import { formatDay } from '../lib/countdown';
 
 const round1 = (value: number) => Math.round(value * 10) / 10;
@@ -45,6 +45,7 @@ export default function MilestoneEditor({
   const [source, setSource] = useState<'ai' | 'template' | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'saving' | 'declined'>('loading');
   const [problem, setProblem] = useState<string | null>(null);
+  const [tooSmall, setTooSmall] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,21 +60,46 @@ export default function MilestoneEditor({
         if (cancelled) return;
         // Alt B — a small task is declined gracefully, not padded out.
         setState('declined');
+        setTooSmall(errorCode(error) === 'task_too_small');
         setProblem(errorMessage(error, 'Could not build a breakdown.'));
       });
     return () => { cancelled = true; };
   }, [task.taskId]);
+
+  /**
+   * Alt B — the single-milestone option offered alongside the decline.
+   *
+   * One row covering the whole estimate. The server re-runs the same
+   * scheduling constraints on save, so the date lands a full day before the
+   * deadline here exactly as it would in a five-step breakdown.
+   */
+  function makeSingleStep() {
+    setRows([{
+      milestoneId: `single-${Date.now()}`,
+      name: task.title,
+      hours: Number(task.effortHours) || 1,
+      dueAt: task.dueAt,
+      notes: [],
+    }]);
+    setSource('template');
+    setProblem(null);
+    setState('ready');
+  }
 
   const total = useMemo(
     () => round1(rows.reduce((sum, row) => sum + (Number(row.hours) || 0), 0)),
     [rows],
   );
 
+  // 0 when the task carries no estimate — UC-009 Alt A leaves effortHours
+  // absent rather than guessing, and `Number(null)` is 0, not NaN.
+  const estimate = Number(task.effortHours) || 0;
+
   function updateHours(index: number, value: number) {
     setRows((current) => rebalance(
       current.map((row, i) => (i === index ? { ...row, hours: value } : row)),
       index,
-      Number(task.effortHours) || total,
+      estimate || total,
     ));
   }
 
@@ -114,9 +140,23 @@ export default function MilestoneEditor({
     return (
       <div className="rounded-card border border-hairline bg-surface p-5">
         <p className="text-sm text-ink2">{problem}</p>
-        <button type="button" onClick={onCancel} className="mt-3 text-sm font-medium text-ink underline underline-offset-4">
-          Close
-        </button>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          {/* Alt B — declining without offering anything leaves the student
+              where they started. One step is a real answer; five invented
+              ones are not. */}
+          {tooSmall && (
+            <button
+              type="button"
+              onClick={makeSingleStep}
+              className="rounded-lg bg-ink px-3.5 py-2 text-sm font-medium text-plane transition hover:opacity-90"
+            >
+              Track it as one step
+            </button>
+          )}
+          <button type="button" onClick={onCancel} className="text-sm font-medium text-ink underline underline-offset-4">
+            Close
+          </button>
+        </div>
       </div>
     );
   }
@@ -178,8 +218,10 @@ export default function MilestoneEditor({
       </ul>
 
       <div className="mt-3 flex items-center justify-between border-t border-hairline pt-3 text-sm">
-        <span className={`num ${total === Number(task.effortHours) ? 'text-ink2' : 'text-serioustext'}`}>
-          Total {total} h of {task.effortHours} h estimated
+        {/* No estimate on the task means no total to reconcile against —
+            saying "of h estimated" would just look broken. */}
+        <span className={`num ${!estimate || total === estimate ? 'text-ink2' : 'text-serioustext'}`}>
+          {estimate ? `Total ${total} h of ${estimate} h estimated` : `Total ${total} h`}
         </span>
         <button
           type="button"

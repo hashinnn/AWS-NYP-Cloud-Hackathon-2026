@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api, errorCode, errorMessage } from '../lib/api';
 import { useTasks } from '../context/TasksContext';
 import ModuleChip from './ModuleChip';
@@ -44,6 +45,7 @@ export default function AddTaskDialog(
   { onClose, onCreated }: { onClose: () => void; onCreated: (result: any) => void },
 ) {
   const { ranking, refresh } = useTasks();
+  const navigate = useNavigate();
 
   const [type, setType] = useState('assignment');
   const [title, setTitle] = useState('');
@@ -170,7 +172,7 @@ export default function AddTaskDialog(
         role="dialog"
         aria-modal="true"
         aria-label="Add task"
-        className="rise w-full max-w-lg rounded-card border border-hairline bg-surface p-6 shadow-card"
+        className="rise w-full max-w-lg rounded-card border border-hairline bg-surface p-5 shadow-card sm:p-6"
       >
         {stage === 'confirmPast' && (
           <>
@@ -222,10 +224,10 @@ export default function AddTaskDialog(
               </button>
               <button
                 type="button"
-                onClick={onClose}
+                onClick={() => { onClose(); navigate(`/tasks/${duplicate.taskId}`); }}
                 className="rounded-lg border border-hairline px-4 py-2 text-sm text-ink2"
               >
-                Keep the existing one
+                Open existing
               </button>
             </div>
           </>
@@ -291,7 +293,7 @@ export default function AddTaskDialog(
               <p className="mt-1 text-xs text-muted">Will create module {typedCode}.</p>
             )}
 
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="block" htmlFor="task-date">
                 <span className={labelClass}>Deadline</span>
                 <input
@@ -323,7 +325,7 @@ export default function AddTaskDialog(
               <p className="mt-1 text-xs text-warntext">That date has already passed.</p>
             )}
 
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="block" htmlFor="task-weight">
                 <span className={labelClass}>Grade weight %</span>
                 <input

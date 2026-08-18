@@ -1,34 +1,32 @@
 'use strict';
 
 /**
- * PATCH /api/tasks/{taskId} — UC-003. Class B write: no LLM on this path.
- *
- * Returns the full `ranking[]` on every successful edit, because a deadline
- * change alters the ClashPenalty of tasks the student did not touch — a
- * single-task rescore would be quietly wrong (step 5).
+ * PATCH /api/tasks/{taskId} — UC-003 steps 3–6. Class B write: no LLM here.
  */
 
 const { ok, fail } = require('../../lib/http');
 const { validate } = require('../../lib/validate');
-const schema = require('./patchSchema');
+const schema = require('./schema');
 const {
-  getAllForUser, getTask, patchTask, rankedTasks, saveScores,
+  getAllForUser, patchTask, rankedTasks, saveScores, RANKED_STATUSES,
 } = require('../../lib/dynamo/tasks');
-const { extractPrefs, scoringPrefs } = require('../../lib/dynamo/prefs');
 const { extractMilestones, putMilestones } = require('../../lib/dynamo/milestones');
-const { normaliseCode } = require('../../lib/dynamo/modules');
-const { scheduleMilestones } = require('../../lib/milestones/generate');
+const { extractPrefs, scoringPrefs } = require('../../lib/dynamo/prefs');
+const { extractModules, createModule, normaliseCode } = require('../../lib/dynamo/modules');
 const { resolveDueAt } = require('../../lib/tasks/dueAt');
+const { strandedBy, shiftProportionally } = require('../../lib/tasks/milestoneShift');
 const { publicTask } = require('../../lib/loadRanked');
 const score = require('../../lib/scoring');
 
-// Step 5 — the five fields that feed a sub-score. Editing a title moves
-// nothing, so it does not earn a rescore or a stale explanation.
-const RESCORE_TRIGGERS = ['dueAt', 'effortHours', 'gradeWeight', 'prepDays', 'progressPct'];
+const MAX_HISTORY = 50;
+
+// Step 5 — the five inputs whose change invalidates the score, and with it the
+// UC-010 sentence written from that score.
+const RESCORE_FIELDS = ['dueAt', 'effortHours', 'gradeWeight', 'prepDays', 'progressPct'];
 
 const EDITABLE = [
-  'title', 'type', 'dueAt', 'module', 'gradeWeight', 'effortHours',
-  'prepDays', 'progressPct', 'isGroup', 'blockedOnTeammate', 'notes', 'status',
+  'title', 'type', 'module', 'gradeWeight', 'effortHours', 'prepDays',
+  'progressPct', 'isGroup', 'blockedOnTeammate', 'notes', 'status',
 ];
 
 exports.handler = async (event) => {
@@ -39,122 +37,117 @@ exports.handler = async (event) => {
   const errors = validate(body, schema.patchTask);
   if (errors) return fail(400, 'validation_failed', errors[0].message);
 
-  const existing = await getTask(userId, taskId);
-  // 404 rather than 403 for another student's task — a 403 would confirm it
-  // exists (AGENTS §8).
-  if (!existing) return fail(404, 'not_found', 'That task no longer exists.');
-
   const items = await getAllForUser(userId);
   const prefs = scoringPrefs(items, extractPrefs(items));
+  const task = items.find((item) => item.SK === `TASK#${taskId}`);
 
-  const changes = {};
-  for (const field of EDITABLE) {
-    if (body[field] !== undefined) changes[field] = body[field];
-  }
-
-  if (changes.module) changes.module = normaliseCode(changes.module);
-
-  if (changes.dueAt !== undefined) {
-    const resolved = resolveDueAt(changes.dueAt, prefs.tz);
-    if (!resolved) return fail(400, 'validation_failed', 'That deadline is not a date we can read.');
-    changes.dueAt = resolved;
-    // GSI1 is the deadline index — leaving it behind would rank this task at
-    // its old due date in every window query.
-    changes.GSI1SK = `DUE#${resolved}`;
+  // 404 rather than 403 for a task that is not this student's — and the same
+  // 404 for one they soft-deleted, which is reachable only through restore.
+  if (!task || task.status === 'deleted') {
+    return fail(404, 'not_found', 'That task no longer exists.');
   }
 
   const now = new Date().toISOString();
+  const changes = {};
+  const history = [];
 
-  if (changes.status === 'completed' && existing.status !== 'completed') {
-    changes.completedAt = now;
-    changes.lateSubmission = Date.parse(existing.dueAt) < Date.parse(now);
-  }
-  // Step 9 — restoring clears the completion, so an accidental tick is fully
-  // reversible rather than leaving a stale completedAt behind.
-  if (changes.status === 'active') {
-    changes.completedAt = null;
-    changes.overdueSince = null;
+  const recordChange = (field, from, to) => {
+    changes[field] = to;
+    history.push({ at: now, field, from: from ?? null, to: to ?? null });
+  };
+
+  for (const field of EDITABLE) {
+    if (!(field in body)) continue;
+
+    let next = body[field];
+    if (field === 'module') next = next ? normaliseCode(next) : null;
+    if (field === 'title') next = String(next).trim();
+
+    if (next !== task[field]) recordChange(field, task[field], next);
   }
 
-  const moved = RESCORE_TRIGGERS.filter((field) => changes[field] !== undefined
-    && changes[field] !== existing[field]);
-  if (moved.length > 0) changes.explanationStale = true;
+  if ('dueAt' in body) {
+    const dueAt = resolveDueAt(body.dueAt, prefs.tz);
+    if (!dueAt) return fail(400, 'validation_failed', 'That deadline is not a date we can read.');
+    if (dueAt !== task.dueAt) {
+      recordChange('dueAt', task.dueAt, dueAt);
+      // The sparse index mirrors the deadline; a dueAt written without it
+      // would leave the task sorted under its old date in every GSI1 query.
+      changes.GSI1SK = `DUE#${dueAt}`;
+    }
+  }
 
   if (Object.keys(changes).length === 0) {
-    return ok(200, { task: publicTask(existing), ranking: [], warnings: [] });
+    return ok(200, { task: publicTask(task), ranking: [] });
   }
+
+  // Keep a module reference from dangling, the same way UC-002 Alt C does.
+  if (changes.module && !extractModules(items).some((m) => m.code === changes.module)) {
+    await createModule(userId, { code: changes.module });
+  }
+
+  const rescoreNeeded = RESCORE_FIELDS.some((field) => field in changes) || 'status' in changes;
+  if (RESCORE_FIELDS.some((field) => field in changes)) changes.explanationStale = true;
+
+  // Alt A — milestones now sitting past the new deadline.
+  const milestones = extractMilestones(items).filter((m) => m.taskId === taskId);
+  const stranded = changes.dueAt ? strandedBy(milestones, changes.dueAt) : [];
+  let milestonesShifted = 0;
+
+  if (stranded.length > 0 && body.shiftMilestones) {
+    const shifted = shiftProportionally(
+      milestones, task, changes.dueAt, prefs, Date.parse(now),
+    );
+    await putMilestones(userId, taskId, shifted);
+    milestonesShifted = shifted.length;
+  }
+
+  changes.history = [...(task.history || []), ...history].slice(-MAX_HISTORY);
 
   let updated;
   try {
     updated = await patchTask(userId, taskId, changes, body.expectedUpdatedAt);
   } catch (error) {
+    // E2 — the conditional write refused because another tab moved first.
+    // Never overwrite: tell the student their view is out of date.
     if (error.name === 'ConditionalCheckFailedException') {
-      // E2 — two tabs. Refuse rather than overwrite, and say which it was:
-      // the row is gone, or somebody else moved it.
-      const still = await getTask(userId, taskId);
-      return still
-        ? fail(409, 'stale_write', 'This task changed in another tab — reload to see the latest.')
-        : fail(404, 'not_found', 'That task no longer exists.');
+      return fail(409, 'stale_write', 'This task changed in another tab — reload to see the latest.');
     }
     console.error(JSON.stringify({
-      level: 'ERROR', event: 'task_patch_failed', taskId, message: error.message,
+      level: 'ERROR', event: 'task_patch_failed', userId, taskId, message: error.message,
     }));
-    // E1 — nothing was written; the field reverts and the student retries.
-    return fail(503, 'storage_unavailable', 'That change could not be saved — please try again.');
+    return fail(503, 'storage_unavailable', 'Your change could not be saved — please try again.');
   }
 
-  const warnings = [];
-  const milestones = extractMilestones(items).filter((m) => m.taskId === taskId);
-
-  // Alt A — a deadline pulled earlier can strand milestones after it.
-  const stranded = changes.dueAt
-    ? milestones.filter((m) => Date.parse(m.dueAt) >= Date.parse(changes.dueAt))
-    : [];
-
-  if (stranded.length > 0 && body.shiftMilestones) {
-    // Re-running the scheduler rescales the whole breakdown into the new
-    // window and re-applies the one-day buffer and the blocked-day rule, so
-    // an edited deadline cannot produce a milestone the generator would
-    // never have proposed.
-    const rescheduled = scheduleMilestones(
-      milestones.map((m) => ({ ...m, dueAt: updated.dueAt })),
-      updated,
-      prefs,
-      Date.now(),
-    );
-    try {
-      await putMilestones(userId, taskId, rescheduled);
-    } catch (error) {
-      console.error(JSON.stringify({
-        level: 'ERROR', event: 'milestone_shift_failed', taskId, message: error.message,
-      }));
-      warnings.push({ code: 'milestones_not_shifted', message: 'The deadline moved, but the milestone dates could not be updated.' });
-    }
-  } else if (stranded.length > 0) {
-    warnings.push({
-      code: 'milestones_outside_window',
-      message: `${stranded.length} milestone${stranded.length === 1 ? '' : 's'} now fall on or after the new deadline — shift them?`,
-    });
-  }
-
-  // Step 5 — the whole active set, not just this task.
+  // Step 5 — the whole active set. Moving one deadline changes the
+  // ClashPenalty of every task within ±72 hours of it, so rescoring only the
+  // edited task would leave the rest of the list quietly wrong.
   let ranking = [];
   let scored = updated;
-  try {
-    const active = rankedTasks(items)
-      .filter((task) => task.taskId !== taskId)
-      .concat(['active', 'overdue'].includes(updated.status) ? [updated] : []);
-    const ranked = score(active, prefs, now);
-    await saveScores(userId, ranked);
-    scored = ranked.find((task) => task.taskId === taskId) || updated;
-    ranking = ranked;
-  } catch (error) {
-    // E4 — the edit is committed either way; the task carries a "score
-    // pending" badge until the next recompute.
-    console.error(JSON.stringify({
-      level: 'ERROR', event: 'rescore_after_patch_failed', taskId, message: error.message,
-    }));
+  if (rescoreNeeded) {
+    try {
+      const others = rankedTasks(items).filter((item) => item.taskId !== taskId);
+      // Alt B — an archived task is handed back to the engine only if it still
+      // ranks. `score()` passes non-ranking statuses straight through, so
+      // including it would put the thing the student just archived back in
+      // the list they archived it out of.
+      const stillRanks = RANKED_STATUSES.has(updated.status);
+      const ranked = score(stillRanks ? [...others, updated] : others, prefs, now);
+      await saveScores(userId, ranked);
+      scored = ranked.find((item) => item.taskId === taskId) || updated;
+      ranking = ranked;
+    } catch (error) {
+      // E4 — the edit stands; the badge says "score pending" and the hourly
+      // recompute corrects it.
+      console.error(JSON.stringify({
+        level: 'ERROR', event: 'scoring_failed_on_patch', userId, taskId, message: error.message,
+      }));
+    }
   }
 
-  return ok(200, { task: publicTask(scored), ranking: ranking.map(publicTask), warnings });
+  return ok(200, {
+    task: publicTask(scored),
+    ranking: ranking.map(publicTask),
+    ...(stranded.length > 0 ? { milestonesStranded: stranded.length, milestonesShifted } : {}),
+  });
 };

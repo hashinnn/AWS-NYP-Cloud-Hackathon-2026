@@ -259,15 +259,39 @@ Resources:
             Path: /api/tasks
             Method: post
 
-  # UC-003 [P-07] — edit, archive, soft-delete and restore, all as one partial
-  # write. Returns the full ranking because a deadline change alters the
-  # ClashPenalty of tasks the student did not touch.
-  #
-  # NOTE (Hasini): written out of my track to unblock UC-018's availability
-  # control and the Intelligence views that assume an edit path exists. Yours
-  # to take back — the DELETE/restore endpoints in UC-003 steps 7-9 are still
-  # unwritten; `status` on this PATCH covers archive and soft-delete meanwhile.
-  # Least privilege: dynamodb:Query, GetItem, UpdateItem, TransactWriteItems.
+  # UC-003 — the task index the detail screen is reached from.
+  # Least privilege: dynamodb:Query on the table.
+  ListTasksFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/tasks/list.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        ListTasks:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/tasks
+            Method: get
+
+  # UC-003 steps 1–2 — task detail, with its milestones.
+  # Least privilege: dynamodb:Query on the table.
+  GetTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/tasks/get.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        GetTask:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/tasks/{taskId}
+            Method: get
+
+  # UC-003 steps 3–6 — partial update, conditional on updatedAt, then a
+  # rescore of the full active set.
+  # Least privilege: dynamodb:Query, UpdateItem, PutItem on the table.
   PatchTaskFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -316,6 +340,38 @@ Resources:
             Path: /api/prefs
             Method: put
 
+  # UC-003 steps 7–8 — soft delete. Nothing is ever hard-deleted.
+  # Least privilege: dynamodb:Query, UpdateItem on the table.
+  DeleteTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/tasks/remove.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        DeleteTask:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/tasks/{taskId}
+            Method: delete
+
+  # UC-003 step 9 — the 10-second undo.
+  # Least privilege: dynamodb:Query, UpdateItem on the table.
+  RestoreTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/tasks/restore.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        RestoreTask:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/tasks/{taskId}/restore
+            Method: post
+
+  # UC-004's remaining functions — module CRUD (steps 2-3) — land here.
+  # The prefs pair above is written; modules are not.
 
   # ==========================================================================
   # ===== MAHDIYA ============================================================

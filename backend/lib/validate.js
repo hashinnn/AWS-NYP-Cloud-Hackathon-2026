@@ -4,8 +4,7 @@
  * Thin schema helper over **Zod** — the team's one validation library
  * (AGENTS §3: "Joi or Zod, pick one, tell the team, never both").
  *
- * PROVISIONAL: belongs to Philena's [P-02]. The call shape matches the handler
- * skeleton in AGENTS §9 exactly:
+ * The call shape matches the handler skeleton in AGENTS §9 exactly:
  *
  *   const errors = validate(body, schema.createTask);
  *   if (errors) return fail(400, 'validation_failed', errors[0].message);

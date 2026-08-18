@@ -121,6 +121,39 @@ stub('lib/dynamo/tasks.js', {
     ITEMS.push(...items);
     return { created: items, failed: [] };
   },
+  // UC-002's single create (Philena's POST /api/tasks).
+  createTask: async (userId, task) => {
+    const item = {
+      ...task,
+      PK: `USER#${USER}`,
+      SK: `TASK#${task.taskId}`,
+      GSI1PK: `USER#${USER}`,
+      GSI1SK: `DUE#${task.dueAt}`,
+      userId: USER,
+    };
+    ITEMS.push(item);
+    return item;
+  },
+});
+
+stub('lib/dynamo/modules.js', {
+  // UC-002 Alt C — inline module creation. Returns null when it already
+  // exists, exactly as the conditional Put does (UC-004 E1).
+  createModule: async (userId, { code, name, colour, totalWeight }) => {
+    const sk = `MODULE#${code}`;
+    if (ITEMS.some((i) => i.SK === sk)) return null;
+    const real = require(path.join(BACKEND, 'lib/dynamo/modules.js'));
+    const item = {
+      PK: `USER#${USER}`,
+      SK: sk,
+      code,
+      name: name || code,
+      colour: colour || real.colourFor(code),
+      totalWeight: totalWeight ?? 100,
+    };
+    ITEMS.push(item);
+    return item;
+  },
 });
 
 stub('lib/dynamo/prefs.js', {
@@ -146,6 +179,7 @@ stub('lib/dynamo/milestones.js', {
 
 const H = (p) => require(path.join(BACKEND, 'handlers', p)).handler;
 const routes = [
+  ['POST', /^\/api\/tasks$/, H('tasks/create.js')],
   ['GET', /^\/api\/ranking$/, H('views/ranking.js')],
   ['POST', /^\/api\/explain$/, H('explain/explain.js')],
   ['GET', /^\/api\/focus$/, H('focus/get.js')],

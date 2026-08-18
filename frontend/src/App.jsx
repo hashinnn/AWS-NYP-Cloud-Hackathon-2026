@@ -15,6 +15,7 @@ import Today from './pages/Today';
 import Workload from './pages/Workload';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
+import Register from './pages/Register';
 import ThemeToggle from './components/ThemeToggle';
 import { getToken } from './lib/api';
 
@@ -94,6 +95,7 @@ export default function App() {
       <TasksProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           <Route path="/focus" element={<Protected><Focus /></Protected>} />
           <Route path="/today" element={<Protected><Today /></Protected>} />
           <Route path="/workload" element={<Protected><Workload /></Protected>} />

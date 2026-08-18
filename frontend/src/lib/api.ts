@@ -1,9 +1,5 @@
 /**
- * axios instance with the bearer interceptor.
- *
- * PROVISIONAL: this file belongs to Philena's [P-04]. Written here so the
- * Intelligence views can be built and run before the shell lands — replace or
- * reconcile freely.
+ * axios instance with the bearer interceptor — UC-001 steps 7 and 9.
  */
 
 import axios from 'axios';
@@ -11,7 +7,9 @@ import axios from 'axios';
 const TOKEN_KEY = 'deadlineiq.token';
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000',
+  // Falls back to the local dev API (`npm run dev:api` in backend/), which
+  // listens on 3001. Deployed builds set VITE_API_URL to the invoke URL.
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001',
   timeout: 10000,
 });
 
@@ -30,15 +28,57 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+/**
+ * One silent refresh attempt, shared across concurrent 401s so a dashboard
+ * firing five requests at once does not fire five refreshes.
+ *
+ * Uses bare axios rather than `api` — going through the instance would put
+ * this call back through the interceptor below and recurse.
+ */
+let refreshing: Promise<string | null> | null = null;
+
+function refreshToken(): Promise<string | null> {
+  if (refreshing) return refreshing;
+
+  const token = getToken();
+  refreshing = (token
+    ? axios.post(`${api.defaults.baseURL}/api/auth/refresh`, null, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((response) => {
+        setToken(response.data.token);
+        return response.data.token as string;
+      })
+      .catch(() => null)
+    : Promise.resolve(null)
+  ).finally(() => { refreshing = null; }) as Promise<string | null>;
+
+  return refreshing;
+}
+
+// UC-001 E3 — on a 401, try one silent refresh and replay the request. Only on
+// failure do we redirect, preserving where the student was so the round trip
+// through sign-in is invisible.
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
+  async (error) => {
+    const request = error.config;
+    const isAuthCall = String(request?.url || '').includes('/api/auth/');
+
+    if (error.response?.status === 401 && request && !request._retried && !isAuthCall) {
+      request._retried = true;
+
+      const fresh = await refreshToken();
+      if (fresh) {
+        request.headers.Authorization = `Bearer ${fresh}`;
+        return api(request);
+      }
+
       setToken(null);
-      // Preserve where they were so the round trip through login is invisible.
       sessionStorage.setItem('deadlineiq.returnTo', window.location.pathname);
       window.location.assign('/login');
     }
+
     return Promise.reject(error);
   },
 );

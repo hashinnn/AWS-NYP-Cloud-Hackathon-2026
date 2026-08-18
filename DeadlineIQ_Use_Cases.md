@@ -15,7 +15,8 @@ Winning thesis:
   whiteboard. This is the differentiator — everything else supports it.
 
 Use case allocation:
-Philena (Platform & Data):    UC-001 (auth), UC-002 (create task),
+Philena (Platform & Data):    UC-001      (auth),
+                              UC-002 (create task),
                                UC-003 (edit/delete/restore),
                                UC-004 (modules + study availability),
                                plus data model, API Gateway layer, IAM,

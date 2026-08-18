@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * TASK item access. PROVISIONAL — Philena's [P-02].
+ * TASK item access.
  * Every function takes `userId` first and scopes to that partition.
  */
 

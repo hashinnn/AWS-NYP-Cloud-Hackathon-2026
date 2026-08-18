@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MILESTONE item access — UC-012. PROVISIONAL — Philena's [P-02].
+ * MILESTONE item access — UC-012.
  *
  * SK = MILESTONE#<taskId>#<milestoneId>, so one `begins_with` returns every
  * milestone for a task, and a shorter prefix returns every milestone for a

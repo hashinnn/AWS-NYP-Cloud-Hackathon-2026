@@ -1,10 +1,9 @@
 /**
- * PROVISIONAL: Philena's [P-04] / UC-001 owns the real sign-in screen.
- * This exists only so the Intelligence views can be opened against a real API.
+ * UC-001 Alternative Flow A — a returning student signs in.
  */
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { errorMessage } from '../lib/api';
 
@@ -70,6 +69,11 @@ export default function Login() {
         >
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
+
+        <p className="mt-4 text-center text-sm text-muted">
+          New here?{' '}
+          <Link to="/register" className="text-ink underline underline-offset-2">Create an account</Link>
+        </p>
       </form>
     </div>
   );

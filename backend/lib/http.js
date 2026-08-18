@@ -2,10 +2,6 @@
 
 /**
  * API Gateway response helpers — HLD §6.1.
- *
- * PROVISIONAL: this file belongs to Philena's [P-02]. Written here only so the
- * Intelligence handlers can be built and tested before P-02 lands. Replace or
- * reconcile freely — the shapes below are taken straight from the HLD.
  */
 
 // Exactly FRONTEND_URL, never '*' (AGENTS §13).
@@ -27,12 +23,19 @@ function ok(status, body) {
   };
 }
 
-/** Failure. `{code, message}` — the frontend branches on `code` (HLD §6.3). */
-function fail(status, code, message) {
+/**
+ * Failure. `{code, message}` — the frontend branches on `code` (HLD §6.3).
+ *
+ * `extra` carries the payload a *soft* failure needs to be actionable: the
+ * only one today is `duplicate_suspected`, which HLD §6.2 requires to include
+ * the `existing` task so the student can choose "Open existing" over "Create
+ * anyway". Never use it to smuggle a second error shape.
+ */
+function fail(status, code, message, extra) {
   return {
     statusCode: status,
     headers: corsHeaders(),
-    body: JSON.stringify({ code, message }),
+    body: JSON.stringify({ code, message, ...extra }),
   };
 }
 

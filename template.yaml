@@ -1,0 +1,290 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  DeadlineIQ — academic deadline tracking and prioritisation.
+  AWS x NYP Cloud Hackathon 2026, PS-3. One shared stack, four contributors.
+
+# ============================================================================
+#  HOW TO USE THIS FILE  (PROJECT_IMPLEMENTATION_PHASES.md §3.2)
+#
+#  Add your functions inside YOUR OWN comment block, near the bottom.
+#  Everything above the member blocks is SHARED — ask Philena before editing.
+#
+#  Deploy your own functions yourself; nobody queues on anybody:
+#      sam build && sam deploy
+#
+#  Every function needs `Role: !Sub ...${LambdaRoleName}` on it, because the
+#  Learner Lab forbids creating IAM roles and SAM Globals does not support
+#  `Role`. Copy the line from an existing function.
+# ============================================================================
+
+Parameters:
+  TableName:
+    Type: String
+    Default: deadlineiq
+    Description: Single DynamoDB table (HLD §5.2).
+
+  LambdaRoleName:
+    Type: String
+    Default: LabRole
+    Description: >
+      Pre-provisioned execution role. The AWS Academy Learner Lab forbids
+      creating IAM roles and forces LabRole, so every function assumes it.
+      Outside the Lab, point this at a role you created.
+
+  FrontendUrl:
+    Type: String
+    Default: http://localhost:5173
+    Description: >
+      Exact Vercel origin. This is the CORS allowlist — never '*'
+      (AGENTS §13). No trailing slash.
+
+  JwtSecret:
+    Type: String
+    NoEcho: true
+    Description: HS256 signing secret for auth tokens. Never committed.
+
+  AiApiKey:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: >
+      OpenRouter key. Deploy with this BLANK to run the mandatory kill-switch
+      test (AGENTS §15.1) — every AI feature must still work without it.
+
+  AiModel:
+    Type: String
+    Default: ''
+    Description: Free-tier chat model id.
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Architectures: [arm64]
+    MemorySize: 256
+    Timeout: 10
+    CodeUri: backend/
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref TableName
+        FRONTEND_URL: !Ref FrontendUrl
+        JWT_SECRET: !Ref JwtSecret
+        AI_API_KEY: !Ref AiApiKey
+        AI_MODEL: !Ref AiModel
+        NODE_ENV: production
+    # Function-specific variables (S3_BUCKET, SNS_TOPIC_ARN, SMTP_*,
+    # CRON_SECRET) go on the individual function that needs them, in the
+    # owning member's block below.
+
+Resources:
+
+  # ==========================================================================
+  # ===== SHARED — Philena only ==============================================
+  # ==========================================================================
+
+  # --- DynamoDB: the single table (HLD §5.2) --------------------------------
+  #
+  # GSI1 is SPARSE: only TASK# items carry GSI1PK/GSI1SK, so a Query on the
+  # index returns exactly the tasks and never has to filter out milestones,
+  # modules or prefs. Every access pattern in HLD §5.4 resolves to a Query.
+  # There is no Scan anywhere in this system.
+  DeadlineIqTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName
+      BillingMode: PAY_PER_REQUEST      # never provisioned — HLD §10.5
+      AttributeDefinitions:
+        - { AttributeName: PK,     AttributeType: S }
+        - { AttributeName: SK,     AttributeType: S }
+        - { AttributeName: GSI1PK, AttributeType: S }
+        - { AttributeName: GSI1SK, AttributeType: S }
+      KeySchema:
+        - { AttributeName: PK, KeyType: HASH }
+        - { AttributeName: SK, KeyType: RANGE }
+      GlobalSecondaryIndexes:
+        - IndexName: deadline-index
+          KeySchema:
+            - { AttributeName: GSI1PK, KeyType: HASH }
+            - { AttributeName: GSI1SK, KeyType: RANGE }
+          Projection:
+            ProjectionType: ALL
+
+  # --- API Gateway: the REST front door ------------------------------------
+  #
+  # Every route is authorised by default. Public routes opt out explicitly
+  # with `Auth: {Authorizer: NONE}` on their event — there are exactly three:
+  # register, login and refresh.
+  DeadlineIqApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      Cors:
+        AllowOrigin: !Sub "'${FrontendUrl}'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowMethods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
+      Auth:
+        DefaultAuthorizer: JwtAuthorizer
+        # The preflight OPTIONS request carries no Authorization header, so
+        # authorising it would break CORS for every route.
+        AddDefaultAuthorizerToCorsPreflight: false
+        Authorizers:
+          JwtAuthorizer:
+            FunctionArn: !GetAtt AuthorizerFunction.Arn
+            FunctionPayloadType: TOKEN
+            Identity:
+              Header: Authorization
+              ReauthorizeEvery: 300      # HLD §10.1 — cache the policy 5 min
+      # A 401 raised by the authoriser is generated by API Gateway, not by our
+      # code, so without these it would arrive with no CORS header and no
+      # {code,message} body — the browser would report an opaque network
+      # error and the frontend could never branch on it (UC-001 E3).
+      GatewayResponses:
+        UNAUTHORIZED:
+          StatusCode: 401
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: !Sub "'${FrontendUrl}'"
+              Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+          ResponseTemplates:
+            application/json: '{"code":"unauthorised","message":"Please sign in again."}'
+        ACCESS_DENIED:
+          StatusCode: 401
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: !Sub "'${FrontendUrl}'"
+              Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+          ResponseTemplates:
+            application/json: '{"code":"unauthorised","message":"Please sign in again."}'
+
+  # --- Lambda authoriser (UC-001 step 8) ------------------------------------
+  #
+  # Verifies the JWT and injects userId into the request context. This is the
+  # ONLY place userId enters the system — no handler reads it from a body.
+  #
+  # Least privilege (documented per HLD §10.4; LabRole is broader in the Lab):
+  #   logs:CreateLogStream, logs:PutLogEvents on its own log group. No table
+  #   access at all — it verifies a signature and nothing else.
+  AuthorizerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: authorizer/index.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+
+  # ==========================================================================
+  # ===== PHILENA ============================================================
+  # ==========================================================================
+
+  # UC-001 — register. Writes EMAIL# guard + PROFILE + PREFS in one
+  # TransactWriteItems, so a duplicate email leaves no orphan items.
+  # Least privilege: dynamodb:PutItem on the table (transactional).
+  RegisterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/auth/register.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        Register:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/auth/register
+            Method: post
+            Auth:
+              Authorizer: NONE
+
+  # UC-001 Alt A — sign in. One generic message for both failure modes.
+  # Least privilege: dynamodb:GetItem on the table.
+  LoginFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/auth/login.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        Login:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/auth/login
+            Method: post
+            Auth:
+              Authorizer: NONE
+
+  # UC-001 E3 — silent refresh. Deliberately NOT behind the authoriser: an
+  # expired token is exactly the input this endpoint exists to accept, and the
+  # authoriser would reject it before the handler ever ran.
+  # Least privilege: none — it re-signs a token it has verified.
+  RefreshFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/auth/refresh.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        Refresh:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/auth/refresh
+            Method: post
+            Auth:
+              Authorizer: NONE
+
+  # UC-001 — the session bootstrap the frontend calls on load.
+  # Least privilege: dynamodb:GetItem on the table.
+  MeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/users/me.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        Me:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/users/me
+            Method: get
+
+  # UC-002 — create a task. Scores the full active set synchronously and
+  # returns the created task with its priorityScore and subScores.
+  # Least privilege: dynamodb:Query, PutItem, UpdateItem on the table.
+  CreateTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/tasks/create.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        CreateTask:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/tasks
+            Method: post
+
+  # UC-003 / UC-004 functions land here in [P-07] and [P-08].
+
+  # ==========================================================================
+  # ===== MAHDIYA ============================================================
+  # ==========================================================================
+  # S3 bucket + presign, UC-005 parse, UC-006 briefs/extract, UC-007 bulk
+  # import, UC-008 progress. Put S3_BUCKET on your own functions' Environment.
+
+  # ==========================================================================
+  # ===== HASINI =============================================================
+  # ==========================================================================
+  # UC-010 explain, UC-011 focus, UC-012 milestones, UC-013/018 workload,
+  # UC-014 plan, UC-015 weights, UC-009 ranking view.
+
+  # ==========================================================================
+  # ===== ZOE ================================================================
+  # ==========================================================================
+  # UC-019 EventBridge rules + reminder Lambda (Timeout: 30), SNS topic,
+  # UC-020 notification prefs, UC-021 overdue, UC-022 completed, UC-023 .ics.
+  # Put SNS_TOPIC_ARN / SMTP_* / CRON_SECRET on your own functions.
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway invoke URL — this becomes VITE_API_URL on Vercel.
+    Value: !Sub https://${DeadlineIqApi}.execute-api.${AWS::Region}.amazonaws.com/prod
+
+  TableName:
+    Description: DynamoDB table name.
+    Value: !Ref DeadlineIqTable

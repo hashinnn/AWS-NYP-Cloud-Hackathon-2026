@@ -1,7 +1,8 @@
 'use strict';
 
 /**
- * PREFS and PROFILE access. PROVISIONAL — Philena's [P-02].
+ * PREFS access, plus the PROFILE fields scoring needs.
+ * Account creation and PROFILE reads live in `users.js`.
  */
 
 const { GetCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');

@@ -67,7 +67,7 @@ Concretely, this means:
 - **Node.js 20.x on AWS Lambda**, behind **Amazon API Gateway** (REST)
 - **arm64, 256 MB, 10 s timeout** (30 s for `reminders/run` and `briefs/extract`)
 - **Plain handler functions. No Express, no Nest, no framework layer.** A Lambda behind API Gateway does not need a web server inside it
-- Validation with a small schema helper — **Joi or Zod, pick one, tell the team, never both**
+- Validation with a small schema helper — **Zod. Decided; do not add Joi.** Use `lib/validate.js`
 
 ### Database
 - **Amazon DynamoDB, single table** named `deadlineiq`
@@ -75,7 +75,8 @@ Concretely, this means:
 - **No ORM. No relational thinking. No `Scan` in any code path.** Every hot query resolves to a `Query` on the main table or GSI1
 
 ### Auth
-- **Self-managed JWT** — `jsonwebtoken` (HS256, 24 h) + `bcrypt` (cost 10), users stored as `PROFILE` items
+- **Self-managed JWT** — `jsonwebtoken` (HS256, 24 h) + **`bcryptjs`** (cost 10), users stored as `PROFILE` items
+  - `bcryptjs`, not `bcrypt`: `bcrypt` is a native addon, so a build on a Windows laptop does not produce a Linux/arm64 binary and the deployed Lambda crashes unless every member builds through Docker. `bcryptjs` is pure JS, same API, same cost-10 bcrypt hashes. Slower to hash, which is irrelevant at our login volume
 - **Amazon Cognito is NOT used.** It is frequently unavailable in the AWS Academy Learner Lab. Do not add it, do not suggest adding it
 - A **Lambda authoriser** validates the token on every protected route and injects `userId` into the request context
 - 🔴 **`userId` is NEVER read from the request body.** It comes from `event.requestContext.authorizer.userId`, always

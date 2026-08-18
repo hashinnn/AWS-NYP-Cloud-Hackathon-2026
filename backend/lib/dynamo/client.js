@@ -3,9 +3,6 @@
 /**
  * DynamoDB access — HLD §4.5.
  *
- * PROVISIONAL: belongs to Philena's [P-02]. Written to the documented contract
- * so the Intelligence handlers can be built before P-02 lands.
- *
  * Rules this layer exists to enforce:
  *   - one module-scoped client, reused across warm invocations
  *   - every exported function takes `userId` first and builds the partition key

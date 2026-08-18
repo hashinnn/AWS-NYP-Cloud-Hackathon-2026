@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, errorCode, errorMessage } from '../lib/api';
 import { contributionsOf } from '../lib/priority';
 import { formatDate } from '../lib/countdown';
@@ -39,7 +39,7 @@ function splitLocal(iso: string) {
 export default function TaskDetail() {
   const { taskId } = useParams();
   const navigate = useNavigate();
-  const { weights, refresh, ranking } = useTasks();
+  const { weights, refresh, ranking, prefs } = useTasks();
 
   const [task, setTask] = useState<any>(null);
   const [milestones, setMilestones] = useState<any[]>([]);
@@ -373,6 +373,22 @@ export default function TaskDetail() {
               loading={!explanation}
             />
           </div>
+
+          {/*
+            UC-004 Alt A — the student never set their hours, so Effort
+            Pressure is running on defaults. The ranking still works; it is
+            just less specific to them, and saying so is more honest than
+            presenting a default as their capacity.
+          */}
+          {prefs && !prefs.availabilitySetAt && (
+            <p className="mt-3 border-t border-hairline pt-3 text-xs text-muted">
+              Effort Pressure is using default study hours.{' '}
+              <Link to="/setup" className="text-ink underline underline-offset-2">
+                Set your study hours
+              </Link>{' '}
+              for a ranking based on the time you actually have.
+            </p>
+          )}
         </section>
       )}
 

@@ -17,6 +17,7 @@ import Tasks from './pages/Tasks';
 import TaskDetail from './pages/TaskDetail';
 import Workload from './pages/Workload';
 import Settings from './pages/Settings';
+import Setup from './pages/Setup';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ThemeToggle from './components/ThemeToggle';
@@ -29,6 +30,7 @@ const LINKS = [
   ['/tasks', 'Tasks'],
   ['/workload', 'Workload'],
   ['/settings', 'Prioritisation'],
+  ['/setup', 'Setup'],
 ];
 
 function DegradedBanner() {
@@ -190,6 +192,7 @@ export default function App() {
           <Route path="/tasks/:taskId" element={<Protected><TaskDetail /></Protected>} />
           <Route path="/workload" element={<Protected><Workload /></Protected>} />
           <Route path="/settings" element={<Protected><Settings /></Protected>} />
+          <Route path="/setup" element={<Protected><Setup /></Protected>} />
           <Route path="*" element={<Navigate to="/focus" replace />} />
         </Routes>
       </TasksProvider>

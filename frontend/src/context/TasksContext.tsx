@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { api, errorMessage } from '../lib/api';
 import { DEFAULT_WEIGHTS, normaliseWeights } from '../lib/priority';
+import { registerModuleColours } from '../lib/chartTheme';
 
 const TasksContext = createContext<any>(null);
 
@@ -19,6 +20,7 @@ export function TasksProvider({ children }: { children: any }) {
   const [ranking, setRanking] = useState<any[]>([]);
   const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
   const [prefs, setPrefs] = useState<any>(null);
+  const [modules, setModules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [degraded, setDegraded] = useState(false);
@@ -48,28 +50,45 @@ export function TasksProvider({ children }: { children: any }) {
       const response = await api.get('/api/prefs');
       setPrefs(response.data.prefs);
     } catch {
-      setPrefs(null); // UC-004 not deployed yet — views hide the control
+      setPrefs(null); // views hide the availability control rather than guess
+    }
+  }, []);
+
+  // UC-004 step 3 — the colours a student chose have to be registered before
+  // anything renders a module, or the first paint uses the hashed fallback
+  // and then visibly changes colour underneath them.
+  const refreshModules = useCallback(async () => {
+    try {
+      const response = await api.get('/api/modules');
+      setModules(response.data.modules || []);
+      registerModuleColours(response.data.modules || []);
+    } catch {
+      setModules([]);
     }
   }, []);
 
   useEffect(() => {
     refresh();
     refreshPrefs();
-  }, [refresh, refreshPrefs]);
+    refreshModules();
+  }, [refresh, refreshPrefs, refreshModules]);
 
   const value = useMemo(() => ({
     ranking,
     weights,
     prefs,
+    modules,
     loading,
     error,
     degraded,
     refresh,
     refreshPrefs,
+    refreshModules,
     setWeights,
     setPrefs,
     active: ranking.filter((task) => task.status === 'active' || task.status === 'overdue'),
-  }), [ranking, weights, prefs, loading, error, degraded, refresh, refreshPrefs]);
+  }), [ranking, weights, prefs, modules, loading, error, degraded,
+    refresh, refreshPrefs, refreshModules]);
 
   return <TasksContext.Provider value={value}>{children}</TasksContext.Provider>;
 }

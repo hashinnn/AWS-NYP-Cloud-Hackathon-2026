@@ -6,7 +6,7 @@
 
 const { ok, fail } = require('../../lib/http');
 const { validate } = require('../../lib/validate');
-const schema = require('./schema');
+const schema = require('./modulesSchema');
 const { patchModule } = require('../../lib/dynamo/modules');
 
 exports.handler = async (event) => {

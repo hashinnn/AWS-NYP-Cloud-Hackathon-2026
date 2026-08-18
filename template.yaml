@@ -374,7 +374,7 @@ Resources:
   ListModulesFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: handlers/modules/list.handler
+      Handler: handlers/modules-prefs/modulesList.handler
       Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
       Events:
         ListModules:
@@ -388,7 +388,7 @@ Resources:
   CreateModuleFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: handlers/modules/create.handler
+      Handler: handlers/modules-prefs/modulesCreate.handler
       Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
       Events:
         CreateModule:
@@ -402,7 +402,7 @@ Resources:
   PatchModuleFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: handlers/modules/patch.handler
+      Handler: handlers/modules-prefs/modulesPatch.handler
       Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
       Events:
         PatchModule:
@@ -411,36 +411,6 @@ Resources:
             RestApiId: !Ref DeadlineIqApi
             Path: /api/modules/{code}
             Method: patch
-
-  # UC-004 — study availability and blocked dates.
-  # Least privilege: dynamodb:GetItem on the table.
-  GetPrefsFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: handlers/prefs/get.handler
-      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
-      Events:
-        GetPrefs:
-          Type: Api
-          Properties:
-            RestApiId: !Ref DeadlineIqApi
-            Path: /api/prefs
-            Method: get
-
-  # Availability feeds EffortPressure, so this rescores the active set.
-  # Least privilege: dynamodb:Query, UpdateItem on the table.
-  PutPrefsFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: handlers/prefs/put.handler
-      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
-      Events:
-        PutPrefs:
-          Type: Api
-          Properties:
-            RestApiId: !Ref DeadlineIqApi
-            Path: /api/prefs
-            Method: put
 
 
   # ==========================================================================

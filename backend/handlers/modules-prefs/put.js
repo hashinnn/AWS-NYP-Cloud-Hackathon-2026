@@ -27,7 +27,9 @@ exports.handler = async (event) => {
   if (errors) return fail(400, 'validation_failed', errors[0].message);
 
   const changes = {};
-  if (body.blockedDates) changes.blockedDates = body.blockedDates;
+  // Deduped and sorted so the same set of days always stores identically —
+  // otherwise the chip order in Setup reshuffles on every save.
+  if (body.blockedDates) changes.blockedDates = [...new Set(body.blockedDates)].sort();
 
   const items = await getAllForUser(userId);
   const stored = extractPrefs(items);
@@ -41,6 +43,12 @@ exports.handler = async (event) => {
   if (Object.keys(changes).length === 0) {
     return ok(200, { prefs: publicPrefs(stored), ranking: [], warnings: [] });
   }
+
+  // UC-004 Alt A — marks that the student has actually set their hours,
+  // rather than silently inheriting the defaults. Without it there is no
+  // way to tell "3 hours because I said so" from "3 hours because nobody
+  // asked me", and the EffortPressure hint could never be targeted.
+  changes.availabilitySetAt = new Date().toISOString();
 
   const warnings = [];
   const hours = Object.values(changes.availability || stored.availability || {});

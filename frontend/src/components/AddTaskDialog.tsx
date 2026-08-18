@@ -62,6 +62,13 @@ export default function AddTaskDialog(
   const [effortTouched, setEffortTouched] = useState(false);
   const [prepTouched, setPrepTouched] = useState(false);
 
+  // UC-022 steps 4–5 (Zoe) — how far this student's estimates usually sit from
+  // reality, offered here as a suggestion. Fetched once per dialog; a failure
+  // is silent, because a missing hint must never stand between a student and
+  // recording a deadline.
+  const [accuracy, setAccuracy] = useState<number | null>(null);
+  const [hintAccepted, setHintAccepted] = useState(false);
+
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [stage, setStage] = useState<'form' | 'confirmPast' | 'duplicate'>('form');
   const [duplicate, setDuplicate] = useState<any>(null);
@@ -72,6 +79,12 @@ export default function AddTaskDialog(
   const dateRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { titleRef.current?.focus(); }, []);
+
+  useEffect(() => {
+    api.get('/api/completed')
+      .then((response) => setAccuracy(response.data?.stats?.estimationAccuracy ?? null))
+      .catch(() => setAccuracy(null));
+  }, []);
 
   // Step 3 — changing the type re-suggests, but never overwrites a figure the
   // student has already decided for themselves.
@@ -356,6 +369,33 @@ export default function AddTaskDialog(
                 />
               </label>
             </div>
+
+            {/* UC-022 step 4 — the figure is only offered once it is real
+                (three completed tasks with hours logged) and only when it
+                would actually change the number. Accepting it feeds straight
+                into a more honest EffortPressure. */}
+            {accuracy !== null && !hintAccepted
+              && Math.round(Number(effortHours) * accuracy) !== Number(effortHours) && (
+              <p className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-warntint px-3 py-2 text-xs text-warntext">
+                <span>
+                  You usually need about <span className="num font-medium">{accuracy}×</span> your
+                  estimate — consider{' '}
+                  <span className="num font-medium">{Math.round(Number(effortHours) * accuracy)}</span>
+                  {' '}hours instead of <span className="num">{effortHours}</span>.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEffortHours(String(Math.round(Number(effortHours) * accuracy)));
+                    setEffortTouched(true);
+                    setHintAccepted(true);
+                  }}
+                  className="ml-auto font-medium underline underline-offset-2"
+                >
+                  Use it
+                </button>
+              </p>
+            )}
 
             {SHOWS_PREP_DAYS.has(type) && (
               <label className="mt-3 block" htmlFor="task-prep">

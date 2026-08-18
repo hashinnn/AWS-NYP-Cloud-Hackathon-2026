@@ -1,10 +1,10 @@
 /**
  * App shell and routes.
  *
- * PROVISIONAL SHELL: the router, nav and layout belong to Philena's [P-04];
- * the Dashboard (UC-016) and Calendar (UC-017) routes are Zoe's and are left
- * to her. Everything under Focus / Today / Workload / Prioritisation is the
- * Intelligence track (UC-010 → UC-015, UC-018).
+ * The router, nav and layout belong to Philena's [P-04]; Dashboard (UC-016),
+ * Calendar (UC-017), Completed (UC-022) and Notifications (UC-020) are Zoe's
+ * Experience track. Everything under Focus / Today / Workload / Prioritisation
+ * is the Intelligence track (UC-010 → UC-015, UC-018).
  */
 
 import { useState } from 'react';
@@ -20,16 +20,24 @@ import Settings from './pages/Settings';
 import Setup from './pages/Setup';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Dashboard from './pages/Dashboard';
+import Calendar from './pages/Calendar';
+import Completed from './pages/Completed';
+import Notifications from './pages/Notifications';
 import ThemeToggle from './components/ThemeToggle';
 import AddTaskDialog from './components/AddTaskDialog';
 import { getToken } from './lib/api';
 
 const LINKS = [
+  ['/dashboard', 'Dashboard'],
   ['/focus', 'Focus'],
   ['/today', 'Today'],
+  ['/calendar', 'Calendar'],
   ['/tasks', 'Tasks'],
   ['/workload', 'Workload'],
+  ['/completed', 'Completed'],
   ['/settings', 'Prioritisation'],
+  ['/notifications', 'Reminders'],
   ['/setup', 'Setup'],
 ];
 
@@ -186,6 +194,10 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+          <Route path="/calendar" element={<Protected><Calendar /></Protected>} />
+          <Route path="/completed" element={<Protected><Completed /></Protected>} />
+          <Route path="/notifications" element={<Protected><Notifications /></Protected>} />
           <Route path="/focus" element={<Protected><Focus /></Protected>} />
           <Route path="/today" element={<Protected><Today /></Protected>} />
           <Route path="/tasks" element={<Protected><Tasks /></Protected>} />
@@ -193,7 +205,9 @@ export default function App() {
           <Route path="/workload" element={<Protected><Workload /></Protected>} />
           <Route path="/settings" element={<Protected><Settings /></Protected>} />
           <Route path="/setup" element={<Protected><Setup /></Protected>} />
-          <Route path="*" element={<Navigate to="/focus" replace />} />
+          {/* UC-016 step 1 — "the student signs in and lands on the
+              dashboard". It was /focus while the dashboard did not exist. */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </TasksProvider>
     </AuthProvider>

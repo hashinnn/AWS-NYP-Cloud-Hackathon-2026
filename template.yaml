@@ -57,6 +57,42 @@ Parameters:
     Default: ''
     Description: Free-tier chat model id.
 
+  # --- UC-019/UC-023 (Zoe). Added for the reminder pipeline; flagged to
+  #     Philena because Parameters is a shared section. ---------------------
+  CronSecret:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: >
+      Gates POST /api/reminders/run, the manual trigger used to demonstrate
+      the pipeline on stage. Blank means the route is closed, never open.
+
+  ReminderEmail:
+    Type: String
+    Default: ''
+    Description: >
+      Address subscribed to the reminder SNS topic. AWS sends a confirmation
+      link on first deploy — click it before the demo or nothing is delivered.
+
+  SmtpHost:
+    Type: String
+    Default: ''
+    Description: Nodemailer fallback, used only when SNS is blocked (UC-019 E5).
+
+  SmtpUser:
+    Type: String
+    Default: ''
+
+  SmtpPass:
+    Type: String
+    Default: ''
+    NoEcho: true
+
+Conditions:
+  # Zoe (UC-019): the email subscription only exists once an address is given,
+  # so a deploy with ReminderEmail blank still creates the topic and succeeds.
+  HasReminderEmail: !Not [!Equals [!Ref ReminderEmail, '']]
+
 Globals:
   Function:
     Runtime: nodejs20.x
@@ -633,6 +669,257 @@ Resources:
   # UC-019 EventBridge rules + reminder Lambda (Timeout: 30), SNS topic,
   # UC-020 notification prefs, UC-021 overdue, UC-022 completed, UC-023 .ics.
   # Put SNS_TOPIC_ARN / SMTP_* / CRON_SECRET on your own functions.
+  #
+  # THE AWS STORY, as one resource graph:
+  #   DynamoDB → EventBridge (2 rules) → one Lambda → SNS → CloudWatch.
+  # Both rules target the SAME function with different input payloads, so
+  # there is one handler to maintain and one log group to point a judge at.
+
+  # --- SNS: reminder delivery (UC-019 step 7) -------------------------------
+  #
+  # If the Learner Lab audit finds SNS blocked, leave ReminderEmail blank and
+  # set SmtpHost instead — lib/notify/send.js switches on SNS_TOPIC_ARN being
+  # present, so no handler changes (UC-019 E5).
+  ReminderTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: DeadlineIQ
+
+  ReminderSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasReminderEmail
+    Properties:
+      Protocol: email
+      Endpoint: !Ref ReminderEmail
+      TopicArn: !Ref ReminderTopic
+
+  # --- UC-016 dashboard. Class A read: one Query, one scoring pass, no LLM.
+  # Least privilege: dynamodb:Query on the table, PutItem for the roster item.
+  DashboardFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/views/dashboard.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        Dashboard:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/dashboard
+            Method: get
+
+  # --- UC-017 calendar + timeline spans.
+  CalendarFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/views/calendar.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        Calendar:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/calendar
+            Method: get
+
+  # --- UC-022 completed tasks + estimation accuracy.
+  CompletedFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/completed/list.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        Completed:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/completed
+            Method: get
+
+  # --- UC-019: THE scheduled Lambda. Both EventBridge rules point here.
+  #
+  # 30 s (not the shared 10 s) because one invocation rescores every student;
+  # it pages through the roster and writes a cursor before the clock runs out,
+  # so the next tick resumes rather than restarting (E2).
+  #
+  # Least privilege: dynamodb:Query/UpdateItem/PutItem on the table,
+  # sns:Publish on ReminderTopic, logs:* on its own group.
+  ReminderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/reminders/scheduled.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Timeout: 30
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref ReminderTopic
+          SMTP_HOST: !Ref SmtpHost
+          SMTP_USER: !Ref SmtpUser
+          SMTP_PASS: !Ref SmtpPass
+      Events:
+        HourlyRecompute:
+          Type: Schedule
+          Properties:
+            Name: deadlineiq-hourly-recompute
+            Schedule: rate(1 hour)
+            Description: Rescore, transition overdue, nudge and escalate (UC-019).
+            Input: '{"job":"recompute"}'
+        DailyDigest:
+          Type: Schedule
+          Properties:
+            Name: deadlineiq-daily-digest
+            # 00:00 UTC = 08:00 SGT. One rule serves every timezone; each
+            # student's own digestAt is honoured inside the handler (§10.2).
+            Schedule: cron(0 0 * * ? *)
+            Description: Morning digest — today's plan, top 3, anything overdue.
+            Input: '{"job":"digest"}'
+
+  # --- UC-019 Alt B: the manual trigger. Gated by CRON_SECRET in the
+  # Authorization header, NOT by the JWT authoriser — the caller is a machine.
+  ReminderRunFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/reminders/run.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Timeout: 30
+      Environment:
+        Variables:
+          CRON_SECRET: !Ref CronSecret
+          SNS_TOPIC_ARN: !Ref ReminderTopic
+          SMTP_HOST: !Ref SmtpHost
+          SMTP_USER: !Ref SmtpUser
+          SMTP_PASS: !Ref SmtpPass
+      Events:
+        Run:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/reminders/run
+            Method: post
+            Auth:
+              Authorizer: NONE
+
+  # --- UC-020 step 6: "Send test notification" — real path, live proof.
+  ReminderTestFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/reminders/test.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Timeout: 15
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref ReminderTopic
+          SMTP_HOST: !Ref SmtpHost
+          SMTP_USER: !Ref SmtpUser
+          SMTP_PASS: !Ref SmtpPass
+      Events:
+        TestNotification:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/reminders/test
+            Method: post
+
+  # --- UC-020 preferences and the in-app inbox.
+  NotificationPrefsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/notif-prefs/put.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        PutNotificationPrefs:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/prefs/notifications
+            Method: put
+
+  NotificationsListFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/notif-prefs/list.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        ListNotifications:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/notifications
+            Method: get
+
+  NotificationReadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/notif-prefs/read.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        ReadNotification:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/notifications/{id}/read
+            Method: post
+
+  # --- UC-021: the three honest resolutions for an overdue task.
+  ResolveOverdueFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/overdue/resolve.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        Resolve:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/tasks/{taskId}/resolve
+            Method: post
+
+  # --- UC-023: .ics download, feed token, and the public feed.
+  ExportIcsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/export/ics.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        ExportIcs:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/export/ics
+            Method: get
+
+  FeedTokenFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/export/feedToken.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Environment:
+        Variables:
+          API_BASE_URL: !Sub https://${DeadlineIqApi}.execute-api.${AWS::Region}.amazonaws.com/prod
+      Events:
+        FeedToken:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/export/feed-token
+            Method: post
+
+  # A subscribing calendar arrives with no session, so this route is public.
+  # The token IS the credential: 24 random bytes, revocable from settings.
+  FeedFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/export/feed.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        Feed:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/feed/{token}
+            Method: get
+            Auth:
+              Authorizer: NONE
 
 Outputs:
   ApiUrl:
@@ -642,3 +929,7 @@ Outputs:
   TableName:
     Description: DynamoDB table name.
     Value: !Ref DeadlineIqTable
+
+  ReminderTopicArn:
+    Description: SNS topic reminders publish to (UC-019). Confirm the email subscription before the demo.
+    Value: !Ref ReminderTopic

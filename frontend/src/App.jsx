@@ -7,6 +7,7 @@
  * Intelligence track (UC-010 → UC-015, UC-018).
  */
 
+import { useState } from 'react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TasksProvider, useTasks } from './context/TasksContext';
@@ -17,6 +18,7 @@ import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ThemeToggle from './components/ThemeToggle';
+import AddTaskDialog from './components/AddTaskDialog';
 import { getToken } from './lib/api';
 
 const LINKS = [
@@ -42,8 +44,55 @@ function DegradedBanner() {
   );
 }
 
+/**
+ * UC-002 step 8 — what the ranking did with the new task, stated rather than
+ * left for the student to spot. Carries the server's non-blocking warnings
+ * (E2 over-allocation, Alt C module creation) in the same place.
+ */
+function CreatedToast({ result, onDismiss }) {
+  const rank = result.ranking.findIndex((task) => task.taskId === result.task.taskId) + 1;
+  const scored = result.task.priorityScore !== null && result.task.priorityScore !== undefined;
+
+  return (
+    <div className="rise fixed bottom-6 right-6 z-40 max-w-sm rounded-card border border-hairline bg-surface p-4 shadow-card">
+      <p className="text-sm text-ink">
+        <span className="font-medium">{result.task.title}</span> added
+        {scored && rank > 0 && (
+          <>
+            {' — ranked '}
+            <span className="num font-medium">#{rank}</span>
+            {' of '}
+            <span className="num">{result.ranking.length}</span>
+            {', priority '}
+            <span className="num font-medium">{result.task.priorityScore}</span>
+          </>
+        )}
+        {/* E4 — scoring failed but the task is safe; the hourly run fills it in. */}
+        {!scored && <span className="text-ink2"> — score pending</span>}
+      </p>
+
+      {result.task.tight && (
+        <p className="mt-1 text-xs text-crittext">
+          This does not fit in the hours you have before the deadline.
+        </p>
+      )}
+
+      {result.warnings.map((warning) => (
+        <p key={warning.code} className="mt-1 text-xs text-warntext">{warning.message}</p>
+      ))}
+
+      <button type="button" onClick={onDismiss} className="mt-2 text-xs text-muted underline underline-offset-2">
+        Dismiss
+      </button>
+    </div>
+  );
+}
+
 function Shell({ children }) {
   const { logout } = useAuth();
+  const [adding, setAdding] = useState(false);
+  const [created, setCreated] = useState(null);
+
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-hairline bg-surface/85 backdrop-blur">
@@ -71,6 +120,15 @@ function Shell({ children }) {
             ))}
           </div>
 
+          {/* Step 1 — "Add task" is reachable from every view. */}
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="rounded-lg bg-ink px-3 py-1.5 text-sm font-medium text-plane transition hover:opacity-90"
+          >
+            Add task
+          </button>
+
           <ThemeToggle />
 
           <button type="button" onClick={logout} className="text-sm text-muted transition hover:text-ink">
@@ -80,6 +138,13 @@ function Shell({ children }) {
       </header>
       <DegradedBanner />
       <main>{children}</main>
+
+      {adding && (
+        <AddTaskDialog onClose={() => setAdding(false)} onCreated={setCreated} />
+      )}
+      {created && (
+        <CreatedToast result={created} onDismiss={() => setCreated(null)} />
+      )}
     </div>
   );
 }

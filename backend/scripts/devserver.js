@@ -114,6 +114,13 @@ stub('lib/dynamo/tasks.js', {
       }
     }
   },
+  // UC-007's bulk import — mirrors the real BatchWriteItem call against the
+  // in-memory table; nothing here ever fails, so `failed` is always empty.
+  createTasks: async (userId, tasks) => {
+    const items = tasks.map((t) => ({ PK: `USER#${USER}`, SK: `TASK#${t.taskId}`, ...t }));
+    ITEMS.push(...items);
+    return { created: items, failed: [] };
+  },
 });
 
 stub('lib/dynamo/prefs.js', {
@@ -151,6 +158,14 @@ const routes = [
   ['POST', /^\/api\/tasks\/([^/]+)\/milestones\/generate$/, H('milestones/generate.js'), ['taskId']],
   ['PUT', /^\/api\/tasks\/([^/]+)\/milestones$/, H('milestones/put.js'), ['taskId']],
   ['PATCH', /^\/api\/tasks\/([^/]+)\/milestones\/([^/]+)$/, H('milestones/patch.js'), ['taskId', 'id']],
+  // Smart Capture — Mahdiya. `briefs/presign.js` needs a real S3 bucket and
+  // real AWS credentials, so it is not wired here; test it against
+  // `sam local` or a deployed stack instead.
+  ['POST', /^\/api\/parse$/, H('parse/quick.js')],
+  ['POST', /^\/api\/parse\/bulk$/, H('parse/bulk.js')],
+  ['POST', /^\/api\/parse\/bulk\/import$/, H('parse/bulkImport.js')],
+  ['POST', /^\/api\/briefs\/extract$/, H('briefs/extract.js')],
+  ['POST', /^\/api\/tasks\/([^/]+)\/progress$/, H('progress/logProgress.js'), ['taskId']],
 ];
 
 const server = http.createServer(async (req, res) => {
@@ -186,16 +201,8 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, cors);
     return res.end(JSON.stringify({ prefs: ITEMS.find((i) => i.SK === 'PREFS') }));
   }
-  if (/^\/api\/tasks\/[^/]+\/progress$/.test(url.pathname)) {
-    const taskId = url.pathname.split('/')[3];
-    const patch = JSON.parse(body || '{}');
-    const item = ITEMS.find((i) => i.SK === `TASK#${taskId}`);
-    if (patch.progressPct !== undefined) item.progressPct = patch.progressPct;
-    if (patch.hoursLogged) item.hoursSpent = (item.hoursSpent || 0) + patch.hoursLogged;
-    if (item.progressPct >= 100) { item.status = 'completed'; item.completedAt = iso(Date.now()); }
-    res.writeHead(200, cors);
-    return res.end(JSON.stringify({ task: item, ranking: [] }));
-  }
+  // Progress logging is now the real UC-008 handler, registered in `routes`
+  // below (progress/logProgress.js) — no fake stand-in needed here any more.
 
   for (const [method, pattern, handler, names = []] of routes) {
     const match = url.pathname.match(pattern);

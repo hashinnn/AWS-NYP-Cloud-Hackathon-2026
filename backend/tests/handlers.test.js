@@ -25,12 +25,23 @@ const HANDLERS = [
   'workload/apply.js',
   'workload/dismiss.js',
   'plan/today.js',
+  // Smart Capture — Mahdiya (UC-005/006/007/008).
+  'parse/quick.js',
+  'parse/bulk.js',
+  'parse/bulkImport.js',
+  'briefs/extract.js',
+  'briefs/presign.js',
+  'progress/logProgress.js',
 ];
 
-// The only two paths in this track allowed anywhere near the model: UC-010's
-// narration endpoint and UC-012's proposal endpoint. Everything else is a
-// Class A read or a Class B write, where an LLM call is a bug (AGENTS §7).
-const MAY_USE_AI = new Set(['explain/explain.js', 'milestones/generate.js']);
+// The Class C proposal endpoints allowed anywhere near the model: UC-010's
+// narration, UC-012's milestone proposal, and UC-005/006/007's parsers.
+// Everything else is a Class A read or a Class B write, where an LLM call
+// is a bug (AGENTS §7).
+const MAY_USE_AI = new Set([
+  'explain/explain.js', 'milestones/generate.js',
+  'parse/quick.js', 'parse/bulk.js', 'briefs/extract.js',
+]);
 
 const root = path.join(__dirname, '..', 'handlers');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
@@ -96,10 +107,13 @@ describe('Rules that fail review — AGENTS §13', () => {
     };
     roots.forEach(walk);
 
-    assert.ok(callers.length >= 2, 'expected the UC-010 and UC-012 callers');
+    assert.ok(callers.length >= 2, 'expected at least the UC-010 and UC-012 callers');
     for (const [file, source] of callers) {
       assert.ok(/AiUnavailable/.test(source), `${file} does not handle AiUnavailable`);
-      assert.ok(/[Tt]emplate/.test(source), `${file} has no deterministic fallback`);
+      // UC-010/012 (Hasini) fall back to a "template" sentence/breakdown;
+      // UC-005/006/007 (Mahdiya) fall back to "deterministic" chrono-node +
+      // regex parsing (AGENTS §1/§6 use this exact term). Either counts.
+      assert.ok(/[Tt]emplate|[Dd]eterministic/.test(source), `${file} has no documented fallback`);
     }
   });
 
@@ -107,6 +121,9 @@ describe('Rules that fail review — AGENTS §13', () => {
     const catalogue = new Set([
       'validation_failed', 'not_found', 'task_too_small', 'hours_mismatch',
       'no_valid_move', 'scoring_unavailable', 'storage_unavailable',
+      // Smart Capture (Mahdiya) — all documented in HLD §6.3.
+      'progress_out_of_range', 'unparseable', 'no_text_found',
+      'unsupported_type', 'file_too_large',
     ]);
     for (const file of HANDLERS) {
       for (const match of read(file).matchAll(/fail\(\d+,\s*'([a-z_]+)'/g)) {

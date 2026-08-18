@@ -101,7 +101,17 @@ const upsert = (sk, changes) => {
 stub('lib/dynamo/tasks.js', {
   getAllForUser: async () => JSON.parse(JSON.stringify(ITEMS)),
   getTask: async (userId, taskId) => ITEMS.find((i) => i.SK === `TASK#${taskId}`) || null,
-  patchTask: async (userId, taskId, changes) => upsert(`TASK#${taskId}`, { ...changes, updatedAt: iso(Date.now()) }),
+  // The conditional write is honoured here, not just in the deployed stack,
+  // so UC-003 E2 (two tabs, one loses) can be demonstrated locally.
+  patchTask: async (userId, taskId, changes, expectedUpdatedAt) => {
+    const existing = ITEMS.find((i) => i.SK === `TASK#${taskId}`);
+    if (expectedUpdatedAt !== undefined && existing && existing.updatedAt !== expectedUpdatedAt) {
+      const error = new Error('stale');
+      error.name = 'ConditionalCheckFailedException';
+      throw error;
+    }
+    return upsert(`TASK#${taskId}`, { ...changes, updatedAt: iso(Date.now()) });
+  },
   saveScores: async (userId, scored) => {
     for (const t of scored) {
       if (t.subScores) {
@@ -180,6 +190,11 @@ stub('lib/dynamo/milestones.js', {
 const H = (p) => require(path.join(BACKEND, 'handlers', p)).handler;
 const routes = [
   ['POST', /^\/api\/tasks$/, H('tasks/create.js')],
+  ['GET', /^\/api\/tasks$/, H('tasks/list.js')],
+  ['POST', /^\/api\/tasks\/([^/]+)\/restore$/, H('tasks/restore.js'), ['taskId']],
+  ['GET', /^\/api\/tasks\/([^/]+)$/, H('tasks/get.js'), ['taskId']],
+  ['PATCH', /^\/api\/tasks\/([^/]+)$/, H('tasks/patch.js'), ['taskId']],
+  ['DELETE', /^\/api\/tasks\/([^/]+)$/, H('tasks/remove.js'), ['taskId']],
   ['GET', /^\/api\/ranking$/, H('views/ranking.js')],
   ['POST', /^\/api\/explain$/, H('explain/explain.js')],
   ['GET', /^\/api\/focus$/, H('focus/get.js')],
@@ -262,8 +277,15 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // The message is rendered verbatim to the student (HLD §6.1), so it must
+  // read as English rather than as a URL. It still names the route, because
+  // the usual cause is a dev server left running from before the handler was
+  // written — restarting it is the fix.
   res.writeHead(404, cors);
-  return res.end(JSON.stringify({ code: 'not_found', message: url.pathname }));
+  return res.end(JSON.stringify({
+    code: 'not_found',
+    message: `No route for ${req.method} ${url.pathname} on the dev API — restart it if you have just added this handler.`,
+  }));
 });
 
 server.listen(PORT, () => {

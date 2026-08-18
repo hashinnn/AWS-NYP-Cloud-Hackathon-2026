@@ -8,7 +8,8 @@
   },
   "scripts": {
     "test": "node --test \"tests/**/*.test.js\"",
-    "dev:api": "node scripts/devserver.js"
+    "dev:api": "node --watch scripts/devserver.js",
+    "dev:api:once": "node scripts/devserver.js"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1111.0",

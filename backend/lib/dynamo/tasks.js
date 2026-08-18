@@ -165,10 +165,14 @@ async function createTasks(userId, tasks) {
   };
 }
 
+/** Every TASK# item, whatever its status — the UC-003 list and detail views. */
+function extractTasks(items) {
+  return items.filter((item) => String(item.SK || '').startsWith('TASK#'));
+}
+
 /** Tasks that take part in the ranking (HLD §5.6). */
 function rankedTasks(items) {
-  return items.filter((item) => String(item.SK || '').startsWith('TASK#')
-    && RANKED_STATUSES.has(item.status));
+  return extractTasks(items).filter((item) => RANKED_STATUSES.has(item.status));
 }
 
 module.exports = {
@@ -179,6 +183,7 @@ module.exports = {
   createTasks,
   patchTask,
   saveScores,
+  extractTasks,
   rankedTasks,
   RANKED_STATUSES,
 };

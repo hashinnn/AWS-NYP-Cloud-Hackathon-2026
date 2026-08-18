@@ -8,11 +8,13 @@
  */
 
 import { useState } from 'react';
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { Link, NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TasksProvider, useTasks } from './context/TasksContext';
 import Focus from './pages/Focus';
 import Today from './pages/Today';
+import Tasks from './pages/Tasks';
+import TaskDetail from './pages/TaskDetail';
 import Workload from './pages/Workload';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
@@ -24,6 +26,7 @@ import { getToken } from './lib/api';
 const LINKS = [
   ['/focus', 'Focus'],
   ['/today', 'Today'],
+  ['/tasks', 'Tasks'],
   ['/workload', 'Workload'],
   ['/settings', 'Prioritisation'],
 ];
@@ -54,7 +57,9 @@ function CreatedToast({ result, onDismiss }) {
   const scored = result.task.priorityScore !== null && result.task.priorityScore !== undefined;
 
   return (
-    <div className="rise fixed bottom-6 right-6 z-40 max-w-sm rounded-card border border-hairline bg-surface p-4 shadow-card">
+    // Anchored to both edges on a phone: a fixed max-width pinned to `right`
+    // hangs off the left of a 320px screen.
+    <div className="rise fixed bottom-4 left-4 right-4 z-40 rounded-card border border-hairline bg-surface p-4 shadow-card sm:bottom-6 sm:left-auto sm:right-6 sm:max-w-sm">
       <p className="text-sm text-ink">
         <span className="font-medium">{result.task.title}</span> added
         {scored && rank > 0 && (
@@ -81,9 +86,18 @@ function CreatedToast({ result, onDismiss }) {
         <p key={warning.code} className="mt-1 text-xs text-warntext">{warning.message}</p>
       ))}
 
-      <button type="button" onClick={onDismiss} className="mt-2 text-xs text-muted underline underline-offset-2">
-        Dismiss
-      </button>
+      <div className="mt-2 flex gap-3 text-xs">
+        <Link
+          to={`/tasks/${result.task.taskId}`}
+          onClick={onDismiss}
+          className="text-ink underline underline-offset-2"
+        >
+          Open
+        </Link>
+        <button type="button" onClick={onDismiss} className="text-muted underline underline-offset-2">
+          Dismiss
+        </button>
+      </div>
     </div>
   );
 }
@@ -96,7 +110,7 @@ function Shell({ children }) {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-hairline bg-surface/85 backdrop-blur">
-        <nav className="mx-auto flex h-16 max-w-5xl items-center gap-6 px-6">
+        <nav className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 sm:h-16 sm:flex-nowrap sm:gap-x-6 sm:px-6 sm:py-0">
           <span className="flex items-center gap-2 font-semibold tracking-tight text-ink">
             <span className="grid size-6 place-items-center rounded-md bg-ink text-[11px] font-bold text-plane">
               dIQ
@@ -104,14 +118,23 @@ function Shell({ children }) {
             DeadlineIQ
           </span>
 
-          <div className="flex flex-1 items-center gap-0.5">
+          {/*
+            Below `sm` the links drop to their own full-width row instead of
+            squeezing "Add task" and "Sign out" off the right edge. They wrap
+            among themselves rather than scrolling, so nothing is ever hidden
+            behind a gesture the student has to discover.
+          */}
+          <div className="order-last flex w-full flex-wrap items-center gap-0.5 sm:order-none sm:w-auto sm:flex-1 sm:flex-nowrap">
             {LINKS.map(([to, label]) => (
               <NavLink
                 key={to}
                 to={to}
-                className={({ isActive }) => `rounded-lg px-3 py-1.5 text-sm transition ${
+                // Every state is font-medium: switching weight on the active
+                // link would change its width and nudge every sibling along.
+                // The filled pill already carries the distinction.
+                className={({ isActive }) => `rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                   isActive
-                    ? 'bg-ink font-medium text-plane'
+                    ? 'bg-ink text-plane'
                     : 'text-ink2 hover:bg-plane hover:text-ink'
                 }`}
               >
@@ -124,7 +147,7 @@ function Shell({ children }) {
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="rounded-lg bg-ink px-3 py-1.5 text-sm font-medium text-plane transition hover:opacity-90"
+            className="ml-auto shrink-0 rounded-lg bg-ink px-3 py-1.5 text-sm font-medium text-plane transition hover:opacity-90"
           >
             Add task
           </button>
@@ -163,6 +186,8 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/focus" element={<Protected><Focus /></Protected>} />
           <Route path="/today" element={<Protected><Today /></Protected>} />
+          <Route path="/tasks" element={<Protected><Tasks /></Protected>} />
+          <Route path="/tasks/:taskId" element={<Protected><TaskDetail /></Protected>} />
           <Route path="/workload" element={<Protected><Workload /></Protected>} />
           <Route path="/settings" element={<Protected><Settings /></Protected>} />
           <Route path="*" element={<Navigate to="/focus" replace />} />

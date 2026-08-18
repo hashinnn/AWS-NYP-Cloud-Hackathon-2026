@@ -172,6 +172,53 @@ stub('lib/dynamo/prefs.js', {
   patchPrefs: async (userId, changes) => upsert('PREFS', changes),
 });
 
+// ── ZOE — notifications, roster and the calendar feed ──────────────────────
+// The reminder pipeline is stubbed at exactly the same seam as everything
+// else: the conditional write is honoured, so UC-019 E3 (a duplicate
+// EventBridge invocation sending nothing twice) is demonstrable locally.
+let NOTIFS = [];
+let FEED = new Map();
+
+stub('lib/dynamo/notifications.js', {
+  putNotification: async (userId, notification) => {
+    const SK = `NOTIF#${notification.date}#${notification.taskId || notification.rule}#${notification.rule}`;
+    if (NOTIFS.some((n) => n.SK === SK)) return null;
+    const item = { PK: `USER#${USER}`, SK, userId, ...notification };
+    NOTIFS.push(item);
+    return item;
+  },
+  markDelivery: async (userId, sk, changes) => {
+    const item = NOTIFS.find((n) => n.SK === sk);
+    if (item) Object.assign(item, changes);
+  },
+  listForDate: async (userId, date) => NOTIFS.filter((n) => n.SK.startsWith(`NOTIF#${date}#`)),
+  listRecent: async () => [...NOTIFS].reverse(),
+  markRead: async (userId, sk, at) => {
+    const item = NOTIFS.find((n) => n.SK === sk);
+    if (!item) return false;
+    item.readAt = at;
+    return true;
+  },
+  rememberUser: async () => {},
+  listUsers: async (after) => (after ? [] : [{ userId: USER, email: 'demo@nyp.edu.sg' }]),
+  getCursor: async () => null,
+  setCursor: async () => {},
+});
+
+stub('lib/dynamo/feed.js', {
+  issueToken: async (userId) => {
+    const token = 'dev-feed-token';
+    FEED.set(token, userId);
+    return token;
+  },
+  revokeToken: async () => { FEED = new Map(); },
+  userIdForToken: async (token) => (FEED.has(token) ? USER : null),
+});
+
+stub('lib/dynamo/users.js', {
+  getProfile: async () => ITEMS.find((i) => i.SK === 'PROFILE'),
+});
+
 stub('lib/dynamo/milestones.js', {
   getMilestonesForTask: async (userId, taskId) => ITEMS
     .filter((i) => String(i.SK).startsWith(`MILESTONE#${taskId}#`))
@@ -223,6 +270,19 @@ const routes = [
   // the request loop below. (The task routes above are Philena's own.)
   ['GET', /^\/api\/prefs$/, H('modules-prefs/get.js')],
   ['PUT', /^\/api\/prefs$/, H('modules-prefs/put.js')],
+  // ── Experience & Notifications — Zoe ──
+  ['GET', /^\/api\/dashboard$/, H('views/dashboard.js')],
+  ['GET', /^\/api\/calendar$/, H('views/calendar.js')],
+  ['GET', /^\/api\/completed$/, H('completed/list.js')],
+  ['GET', /^\/api\/notifications$/, H('notif-prefs/list.js')],
+  ['POST', /^\/api\/notifications\/([^/]+)\/read$/, H('notif-prefs/read.js'), ['id']],
+  ['PUT', /^\/api\/prefs\/notifications$/, H('notif-prefs/put.js')],
+  ['POST', /^\/api\/reminders\/run$/, H('reminders/run.js')],
+  ['POST', /^\/api\/reminders\/test$/, H('reminders/test.js')],
+  ['POST', /^\/api\/tasks\/([^/]+)\/resolve$/, H('overdue/resolve.js'), ['taskId']],
+  ['GET', /^\/api\/export\/ics$/, H('export/ics.js')],
+  ['POST', /^\/api\/export\/feed-token$/, H('export/feedToken.js')],
+  ['GET', /^\/api\/feed\/([^/]+)$/, H('export/feed.js'), ['token']],
 ];
 
 const server = http.createServer(async (req, res) => {
@@ -271,10 +331,15 @@ const server = http.createServer(async (req, res) => {
         httpMethod: method,
         pathParameters,
         queryStringParameters: Object.fromEntries(url.searchParams),
+        // Zoe's POST /api/reminders/run authenticates on a header rather than
+        // the JWT, so headers have to survive the hop into the handler.
+        headers: req.headers,
         body,
         requestContext: { authorizer: { userId: USER } },
       });
-      res.writeHead(result.statusCode, cors);
+      // A handler that sets its own Content-Type means it (`text/calendar`,
+      // `text/csv`) — do not overwrite it with the JSON default.
+      res.writeHead(result.statusCode, { ...cors, ...(result.headers || {}) });
       return res.end(result.body || '');
     } catch (error) {
       console.error('handler threw:', url.pathname, error);

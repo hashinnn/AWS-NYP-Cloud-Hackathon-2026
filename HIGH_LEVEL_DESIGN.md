@@ -532,7 +532,7 @@ SK   NOTIF#2026-08-24#<taskId>#same_day_nudge
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `rule` | enum | `digest\|same_day_nudge\|escalation\|crash_week\|overdue_group` |
+| `rule` | enum | `digest\|same_day_nudge\|escalation\|crash_week\|overdue_group\|lead_time` |
 | `channel` | enum | `email\|in_app` |
 | `subject`, `body` | string | Rendered content |
 | `deliveredAt` | ISO8601 \| null | |
@@ -1045,8 +1045,9 @@ Two rules, **one Lambda**, distinguished by the input payload — so there is on
 | b | **Same-day nudge** | `dueAt` within 24 h AND `progressPct < 90` | "Assignment due in 24 hours — you're at 60%" |
 | c | **Escalation** | `ProgressDeficit > 40` AND `dueAt` within 48 h | "You're 45% behind on a task due in 2 days" |
 | d | **Crash-week alert** | UC-013 flags a *newly* overloaded week; max once per week | "Week of 24 Aug is 7 hours over capacity" |
+| e | **Lead-time reminder** | `dueAt` crosses the student's per-type lead window (UC-020 step 3: tests 7 d, projects 5 d, assignments and presentations 3 d) AND `progressPct < 90`; fires once, on the crossing | "Time to start IT2213 Networking Test — due in 7 days, 6 hours of work remain" |
 
-Rule (c) is what makes the reminders *adaptive* rather than merely scheduled — it fires on the student's actual state, not on the calendar.
+Rule (c) is what makes the reminders *adaptive* rather than merely scheduled — it fires on the student's actual state, not on the calendar. Rule (e) is what makes the per-type lead times in UC-020 a *reminder* control rather than only a calendar-alarm one: it is the reason a test starts nudging a week out and a quiz does not. It is evaluated last, so under the daily cap it always yields to a deadline that has already arrived.
 
 ### 9.3 Notification budget — the brief asks about this explicitly
 

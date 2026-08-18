@@ -93,11 +93,37 @@ export const LOAD_BANDS = {
 export type LoadBand = keyof typeof LOAD_BANDS;
 
 /**
+ * Colours the student chose in Setup (UC-004 step 2), by module code.
+ *
+ * Registered once when the module list loads, rather than threaded through
+ * every call site, so `ModuleChip`, the calendar and the charts keep asking
+ * for a colour with nothing but a code — which is what makes it impossible
+ * for two views to disagree about a module's colour.
+ *
+ * A stored value is a PALETTE hex, but it is resolved back to a *slot* so the
+ * rendered colour is still a CSS variable. Emitting the stored hex directly
+ * would freeze the module to its light-theme colour in dark mode.
+ */
+const chosenSlots = new Map<string, number>();
+
+export function registerModuleColours(modules: { code: string; colour?: string | null }[]) {
+  chosenSlots.clear();
+  for (const { code, colour } of modules || []) {
+    const slot = PALETTE.light.series.indexOf(colour as never);
+    if (code && slot >= 0) chosenSlots.set(code, slot + 1);
+  }
+}
+
+/**
  * Stable module colour: the same code always gets the same slot, in every
  * chart, card and calendar entry, across renders, reloads and both themes.
+ * A colour the student picked wins; otherwise the code hashes to a slot.
  */
 export function moduleSlot(code?: string | null): number | null {
   if (!code) return null;
+  const chosen = chosenSlots.get(code);
+  if (chosen) return chosen;
+
   let hash = 0;
   for (let i = 0; i < code.length; i += 1) {
     hash = (hash * 31 + code.charCodeAt(i)) >>> 0;

@@ -164,6 +164,7 @@ stub('lib/dynamo/modules.js', {
     ITEMS.push(item);
     return item;
   },
+  patchModule: async (userId, code, changes) => upsert(`MODULE#${code}`, changes),
 });
 
 stub('lib/dynamo/prefs.js', {
@@ -195,6 +196,11 @@ const routes = [
   ['GET', /^\/api\/tasks\/([^/]+)$/, H('tasks/get.js'), ['taskId']],
   ['PATCH', /^\/api\/tasks\/([^/]+)$/, H('tasks/patch.js'), ['taskId']],
   ['DELETE', /^\/api\/tasks\/([^/]+)$/, H('tasks/remove.js'), ['taskId']],
+  ['GET', /^\/api\/modules$/, H('modules/list.js')],
+  ['POST', /^\/api\/modules$/, H('modules/create.js')],
+  ['PATCH', /^\/api\/modules\/([^/]+)$/, H('modules/patch.js'), ['code']],
+  ['GET', /^\/api\/prefs$/, H('prefs/get.js')],
+  ['PUT', /^\/api\/prefs$/, H('prefs/put.js')],
   ['GET', /^\/api\/ranking$/, H('views/ranking.js')],
   ['POST', /^\/api\/explain$/, H('explain/explain.js')],
   ['GET', /^\/api\/focus$/, H('focus/get.js')],
@@ -249,8 +255,11 @@ const server = http.createServer(async (req, res) => {
       prefs: ITEMS.find((i) => i.SK === 'PREFS'),
     }));
   }
-  // Prefs and progress are both real handlers now, registered in `routes`
-  // above — no fake stand-ins needed here any more.
+  // /api/prefs is no longer faked here — UC-004's real handlers are wired
+  // into `routes` below.
+  // Progress logging is now the real UC-008 handler, registered in `routes`
+  // below (progress/logProgress.js) — no fake stand-in needed here any more.
+
 
   for (const [method, pattern, handler, names = []] of routes) {
     const match = url.pathname.match(pattern);

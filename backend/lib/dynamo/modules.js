@@ -4,8 +4,8 @@
  * MODULE item access — UC-004, and UC-002 Alt C's inline creation.
  */
 
-const { QueryCommand, PutCommand } = require('@aws-sdk/lib-dynamodb');
-const { send, TABLE_NAME, pk } = require('./client');
+const { QueryCommand, PutCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
+const { send, TABLE_NAME, pk, buildUpdate } = require('./client');
 
 const DEFAULT_TOTAL_WEIGHT = 100;
 
@@ -75,11 +75,39 @@ async function createModule(userId, { code, name, colour, totalWeight }) {
   return item;
 }
 
+/**
+ * @returns {object|null} the updated module, or null when the code does not
+ *   exist under this student's partition (404, never 403).
+ */
+async function patchModule(userId, code, changes) {
+  const moduleCode = normaliseCode(code);
+  const update = buildUpdate(changes);
+  if (update.isEmpty) return null;
+
+  try {
+    const result = await send(new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: { PK: pk(userId), SK: `MODULE#${moduleCode}` },
+      UpdateExpression: update.UpdateExpression,
+      ExpressionAttributeNames: update.ExpressionAttributeNames,
+      ExpressionAttributeValues: update.ExpressionAttributeValues,
+      ConditionExpression: 'attribute_exists(SK)',
+      ReturnValues: 'ALL_NEW',
+    }));
+    return result.Attributes;
+  } catch (error) {
+    if (error.name === 'ConditionalCheckFailedException') return null;
+    throw error;
+  }
+}
+
 module.exports = {
   getModules,
   extractModules,
   createModule,
+  patchModule,
   colourFor,
   normaliseCode,
+  SERIES,
   DEFAULT_TOTAL_WEIGHT,
 };

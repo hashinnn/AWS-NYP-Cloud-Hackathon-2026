@@ -504,7 +504,11 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, cors);
     return res.end(JSON.stringify({
       token: 'dev-token',
-      user: { userId: USER, displayName: 'Demo Student', email: 'demo@nyp.edu.sg' },
+      // The SAME profile /api/users/me returns. A second hardcoded identity
+      // here meant the display name changed depending on whether you had just
+      // signed in or just reloaded — one student saw "Demo Student", the next
+      // saw "Alex Tan", from the same fixture.
+      user: ITEMS.find((i) => i.SK === 'PROFILE'),
     }));
   }
   if (url.pathname === '/api/users/me') {

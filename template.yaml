@@ -449,6 +449,51 @@ Resources:
             Method: patch
 
 
+  # --- Study companion (beyond the 23 UCs; product-owner request) ----------
+  # Points are DERIVED from completed tasks, so these functions can only ever
+  # read tasks and write the CHARACTER item.
+  # Least privilege: dynamodb:Query on the table.
+  GetCharacterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/character/get.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        GetCharacter:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/character
+            Method: get
+
+  # Least privilege: dynamodb:GetItem, UpdateItem on the table.
+  PutCharacterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/character/put.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        PutCharacter:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/character
+            Method: put
+
+  # Least privilege: dynamodb:Query, UpdateItem on the table.
+  PurchaseFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/character/purchase.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        Purchase:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/character/purchase
+            Method: post
+
   # ==========================================================================
   # ===== MAHDIYA ============================================================
   # ==========================================================================

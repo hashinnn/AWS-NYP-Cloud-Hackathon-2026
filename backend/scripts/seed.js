@@ -93,7 +93,18 @@ function task(fields) {
     completedAt: null,
     lateSubmission: false,
     overdueSince: overdue ? dueAt : null,
-    history: [],
+    // Logged hours carry a timestamp, not just a total. UC-008 always writes
+    // this entry when a student logs progress, so anything asking "when did
+    // they last study" works on real accounts. A seed that set only the total
+    // would leave the demo account looking like it had never been opened.
+    history: fields.hoursSpent
+      ? [{
+        at: iso(now - days(fields.studiedDaysAgo ?? 1)),
+        field: 'hoursSpent',
+        from: 0,
+        to: fields.hoursSpent,
+      }]
+      : [],
   };
 }
 
@@ -109,6 +120,7 @@ const TASKS = [
     effortHours: 12,
     progressPct: 15,
     hoursSpent: 1.8,
+    studiedDaysAgo: 0.2,
     dueAt: iso(now + days(3)),
   }),
   // prepDays = 3 pulls the effective deadline to day 2, so this outranks the

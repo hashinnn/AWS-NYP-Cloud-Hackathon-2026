@@ -19,6 +19,7 @@ import TaskDetail from './pages/TaskDetail';
 import Workload from './pages/Workload';
 import Settings from './pages/Settings';
 import Setup from './pages/Setup';
+import Profile from './pages/Profile';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -28,6 +29,7 @@ import Gpa from './pages/Gpa';
 import Notifications from './pages/Notifications';
 import ThemeToggle from './components/ThemeToggle';
 import AddTaskDialog from './components/AddTaskDialog';
+import CharacterWidget from './components/CharacterWidget';
 import QuickAddBar, { focusQuickAdd } from './components/QuickAddBar';
 import BulkImportDialog from './components/BulkImportDialog';
 import BriefUploadDialog from './components/BriefUploadDialog';
@@ -57,6 +59,7 @@ const NAV_GROUPS = [
   ['Tune', [
     ['/settings', 'Prioritisation', 'M5 8h9m4 0h1M5 16h1m4 0h9M14 5.8a2.2 2.2 0 1 0 0 4.4 2.2 2.2 0 0 0 0-4.4zM8 13.8a2.2 2.2 0 1 0 0 4.4 2.2 2.2 0 0 0 0-4.4z'],
     ['/setup', 'Setup', 'M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7zm7.5-3.5.9-2.4-2-1.5.1-2.5-2.4-.7-1.2-2.2L12.5 4l-2.4-1.3-1.2 2.2-2.4.7.1 2.5-2 1.5.9 2.4-.9 2.4 2 1.5-.1 2.5 2.4.7 1.2 2.2 2.4-1.3 2.4 1.3 1.2-2.2 2.4-.7-.1-2.5 2-1.5z'],
+    ['/profile', 'Profile', 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2.5c-4 0-7 2.2-7 5v1h14v-1c0-2.8-3-5-7-5z'],
   ]],
 ];
 
@@ -379,6 +382,9 @@ function Shell({ children }) {
           onFallbackForm={(prefill) => openForm(prefill)}
         />
       )}
+      {/* The companion sits above every screen, and can be dismissed for good. */}
+      <CharacterWidget />
+
       {created && (
         <CreatedToast result={created} onDismiss={() => setCreated(null)} />
       )}
@@ -410,6 +416,7 @@ export default function App() {
           <Route path="/workload" element={<Protected><Workload /></Protected>} />
           <Route path="/settings" element={<Protected><Settings /></Protected>} />
           <Route path="/setup" element={<Protected><Setup /></Protected>} />
+          <Route path="/profile" element={<Protected><Profile /></Protected>} />
           {/* UC-016 step 1 — "the student signs in and lands on the
               dashboard". It was /focus while the dashboard did not exist. */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

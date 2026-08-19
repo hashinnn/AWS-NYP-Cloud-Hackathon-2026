@@ -280,6 +280,20 @@ button:not(:disabled) {
   }
 }
 
+/* The companion breathes. Idle motion is what separates "a character" from
+   "an icon" — and it stops entirely for reduced-motion users. */
+@media (prefers-reduced-motion: no-preference) {
+  .companion {
+    animation: breathe 4s ease-in-out infinite;
+    transform-origin: 50% 90%;
+  }
+}
+
+@keyframes breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-2px) scale(1.02); }
+}
+
 @keyframes rise {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }

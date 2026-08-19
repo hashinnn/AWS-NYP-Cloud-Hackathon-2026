@@ -100,6 +100,9 @@ let ITEMS = [
     notes: 'ERD + normalisation write-up. Prof wants the query plans annotated.',
     history: [
       { at: iso(now - days(2)), field: 'progressPct', from: 0, to: 15 },
+      // WHEN the hours went in, not just how many — the companion's mood and
+      // anything else time-aware reads this, exactly as UC-008 writes it.
+      { at: iso(now - days(0.2)), field: 'hoursSpent', from: 0, to: 2 },
     ],
   }),
   task({
@@ -374,6 +377,21 @@ stub('lib/dynamo/users.js', {
   getProfile: async () => ITEMS.find((i) => i.SK === 'PROFILE'),
 });
 
+stub('lib/dynamo/character.js', {
+  getCharacter: async () => {
+    const real = require(path.join(BACKEND, 'lib/dynamo/character.js'));
+    const item = ITEMS.find((i) => i.SK === 'CHARACTER');
+    return { ...real.DEFAULT_CHARACTER, ...(item || {}) };
+  },
+  patchCharacter: async (userId, changes) => {
+    const real = require(path.join(BACKEND, 'lib/dynamo/character.js'));
+    let item = ITEMS.find((i) => i.SK === 'CHARACTER');
+    if (!item) { item = { PK: `USER#${USER}`, SK: 'CHARACTER', ...real.DEFAULT_CHARACTER }; ITEMS.push(item); }
+    Object.assign(item, changes);
+    return { ...real.DEFAULT_CHARACTER, ...item };
+  },
+});
+
 stub('lib/dynamo/milestones.js', {
   getMilestonesForTask: async (userId, taskId) => ITEMS
     .filter((i) => String(i.SK).startsWith(`MILESTONE#${taskId}#`))
@@ -401,6 +419,9 @@ const routes = [
   ['GET', /^\/api\/modules$/, H('modules-prefs/modulesList.js')],
   ['POST', /^\/api\/modules$/, H('modules-prefs/modulesCreate.js')],
   ['PATCH', /^\/api\/modules\/([^/]+)$/, H('modules-prefs/modulesPatch.js'), ['code']],
+  ['GET', /^\/api\/character$/, H('character/get.js')],
+  ['PUT', /^\/api\/character$/, H('character/put.js')],
+  ['POST', /^\/api\/character\/purchase$/, H('character/purchase.js')],
   ['GET', /^\/api\/ranking$/, H('views/ranking.js')],
   ['POST', /^\/api\/explain$/, H('explain/explain.js')],
   ['GET', /^\/api\/focus$/, H('focus/get.js')],

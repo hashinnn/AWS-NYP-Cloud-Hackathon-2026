@@ -12,6 +12,7 @@ import { api, errorMessage } from '../lib/api';
 import { useTasks } from '../context/TasksContext';
 import { useAuth } from '../context/AuthContext';
 import Character, { type Mood } from '../components/Character';
+import { HIDDEN_KEY, setCompanionHidden } from '../components/CharacterWidget';
 
 const WEEKDAYS: [string, string][] = [
   ['mon', 'Mon'], ['tue', 'Tue'], ['wed', 'Wed'], ['thu', 'Thu'],
@@ -43,6 +44,9 @@ export default function Profile() {
   // What the student is trying on but has NOT bought. Purely local: it is
   // never sent anywhere until they press Buy.
   const [tryOn, setTryOn] = useState<any>(null);
+  const [onEveryPage, setOnEveryPage] = useState(
+    () => localStorage.getItem(HIDDEN_KEY) !== '1',
+  );
 
   const load = useCallback(async () => {
     try {
@@ -144,6 +148,18 @@ export default function Profile() {
               <span className="font-semibold">{balance}</span>
               <span className="text-muted"> points · {completed} task{completed === 1 ? '' : 's'} completed</span>
             </p>
+
+            <label className="mt-3 flex items-center gap-2 text-sm text-ink2">
+              <input
+                type="checkbox"
+                checked={onEveryPage}
+                onChange={(e) => {
+                  setOnEveryPage(e.target.checked);
+                  setCompanionHidden(!e.target.checked);
+                }}
+              />
+              Show on every page
+            </label>
           </div>
         </div>
 

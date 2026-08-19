@@ -15,7 +15,19 @@ import { api } from '../lib/api';
 import { useTasks } from '../context/TasksContext';
 import Character, { type Mood } from './Character';
 
-const HIDDEN_KEY = 'deadlineiq.companion.hidden';
+export const HIDDEN_KEY = 'deadlineiq.companion.hidden';
+
+/**
+ * Hiding is reversible from Profile, and the toggle there fires this so the
+ * companion reappears immediately instead of on the next full page load.
+ * A control whose effect you cannot see is a control you stop trusting.
+ */
+export const COMPANION_EVENT = 'deadlineiq:companion-visibility';
+
+export function setCompanionHidden(hidden: boolean) {
+  localStorage.setItem(HIDDEN_KEY, hidden ? '1' : '0');
+  window.dispatchEvent(new CustomEvent(COMPANION_EVENT, { detail: hidden }));
+}
 
 const TONE: Record<Mood, string> = {
   happy: 'border-good/40 bg-goodtint',
@@ -44,6 +56,12 @@ export default function CharacterWidget() {
   // task updates the mood without a refresh.
   useEffect(() => { load(); }, [load, ranking]);
 
+  useEffect(() => {
+    const onToggle = (event: any) => setHidden(Boolean(event.detail));
+    window.addEventListener(COMPANION_EVENT, onToggle);
+    return () => window.removeEventListener(COMPANION_EVENT, onToggle);
+  }, []);
+
   if (hidden || !data) return null;
 
   const mood: Mood = data.mood?.state || 'neutral';
@@ -63,7 +81,10 @@ export default function CharacterWidget() {
             </Link>
             <button
               type="button"
-              onClick={() => { setHidden(true); localStorage.setItem(HIDDEN_KEY, '1'); }}
+              // Says where it went. A hide with no visible way back is a
+              // feature the student loses rather than turns off.
+              title="You can bring it back from Profile"
+              onClick={() => { setHidden(true); setCompanionHidden(true); }}
               className="ml-auto text-muted underline underline-offset-2"
             >
               Hide

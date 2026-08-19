@@ -1069,9 +1069,6 @@ Resources:
     Properties:
       Handler: handlers/export/feedToken.handler
       Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
-      Environment:
-        Variables:
-          API_BASE_URL: !Sub https://${DeadlineIqApi}.execute-api.${AWS::Region}.amazonaws.com/prod
       Events:
         FeedToken:
           Type: Api

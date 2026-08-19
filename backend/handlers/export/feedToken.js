@@ -25,7 +25,14 @@ exports.handler = async (event) => {
     }
 
     const token = await issueToken(userId, existing);
-    const base = process.env.API_BASE_URL || '';
+    // Derived from the request, never from the environment. Injecting the
+    // API's own URL into a function that the API depends on is a circular
+    // CloudFormation dependency, and it fails the whole stack. API Gateway
+    // already tells us the hostname and stage, so nothing needs configuring —
+    // and this keeps working on any stage or custom domain for free.
+    const rc = event.requestContext || {};
+    const base = process.env.API_BASE_URL
+      || (rc.domainName ? `https://${rc.domainName}/${rc.stage}` : '');
 
     return ok(200, {
       feedUrl: `${base}/api/feed/${token}.ics`,

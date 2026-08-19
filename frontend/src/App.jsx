@@ -24,6 +24,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Calendar from './pages/Calendar';
 import Completed from './pages/Completed';
+import Gpa from './pages/Gpa';
 import Notifications from './pages/Notifications';
 import ThemeToggle from './components/ThemeToggle';
 import AddTaskDialog from './components/AddTaskDialog';
@@ -50,6 +51,7 @@ const NAV_GROUPS = [
   ]],
   ['Review', [
     ['/completed', 'Completed', 'M9 12.5l2 2 4-4.5M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18z'],
+    ['/gpa', 'CGPA', 'M6.5 3.5h11a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1zM9 7.5h6M9 11.5h2.5m3 0H15M9 15h2.5m3 0H15'],
     ['/notifications', 'Reminders', 'M6 9.5a6 6 0 1 1 12 0c0 5 1.8 6 1.8 6H4.2s1.8-1 1.8-6m4.2 9a2.1 2.1 0 0 0 3.6 0'],
   ]],
   ['Tune', [
@@ -57,6 +59,14 @@ const NAV_GROUPS = [
     ['/setup', 'Setup', 'M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7zm7.5-3.5.9-2.4-2-1.5.1-2.5-2.4-.7-1.2-2.2L12.5 4l-2.4-1.3-1.2 2.2-2.4.7.1 2.5-2 1.5.9 2.4-.9 2.4 2 1.5-.1 2.5 2.4.7 1.2 2.2 2.4-1.3 2.4 1.3 1.2-2.2 2.4-.7-.1-2.5 2-1.5z'],
   ]],
 ];
+
+/**
+ * Simple mode strips the rail to the four essentials — a deadline tracker
+ * first, an intelligence console only when asked. Every route stays live in
+ * both modes; only the navigation changes.
+ */
+const APP_VIEW_KEY = 'deadlineiq.appView';
+const SIMPLE_PATHS = new Set(['/dashboard', '/focus', '/calendar', '/tasks']);
 
 function NavIcon({ d }) {
   return (
@@ -174,6 +184,11 @@ function Shell({ children }) {
   const [brief, setBrief] = useState(false);              // UC-006
   const [created, setCreated] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [appView, setAppView] = useState(
+    () => (localStorage.getItem(APP_VIEW_KEY) === 'advanced' ? 'advanced' : 'simple'),
+  );
+
+  useEffect(() => { localStorage.setItem(APP_VIEW_KEY, appView); }, [appView]);
 
   function openForm(initial = null) {
     setFormInitial(initial);
@@ -193,11 +208,20 @@ function Shell({ children }) {
   // count until every one of them has been resolved.
   const overdueCount = (ranking || []).filter((task) => task.status === 'overdue').length;
 
-  const nav = NAV_GROUPS.map(([group, links]) => (
-    <div key={group}>
-      <p className="px-3 pb-1.5 pt-5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
-        {group}
-      </p>
+  // Simple: one flat list of the essentials, no group headers to parse.
+  const navGroups = appView === 'simple'
+    ? [[null, NAV_GROUPS.flatMap(([, links]) => links).filter(([to]) => SIMPLE_PATHS.has(to))]]
+    : NAV_GROUPS;
+
+  const nav = navGroups.map(([group, links]) => (
+    <div key={group || 'simple'}>
+      {group ? (
+        <p className="px-3 pb-1.5 pt-5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+          {group}
+        </p>
+      ) : (
+        <div className="pt-4" />
+      )}
       {links.map(([to, label, icon]) => (
         <NavLink
           key={to}
@@ -221,6 +245,36 @@ function Shell({ children }) {
     </div>
   ));
 
+  const viewToggle = (
+    <div className="px-3 pb-3">
+      <div
+        className="grid grid-cols-2 gap-1 rounded-lg border border-hairline bg-plane p-1"
+        role="radiogroup"
+        aria-label="Navigation mode"
+      >
+        {[['simple', 'Simple'], ['advanced', 'Advanced']].map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={appView === value}
+            onClick={() => setAppView(value)}
+            className={`rounded-md px-2 py-1 text-xs transition ${
+              appView === value ? 'bg-accent font-medium text-plane' : 'text-ink2 hover:text-ink'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {appView === 'simple' && (
+        <p className="mt-1.5 px-0.5 text-[10px] leading-snug text-muted">
+          Just the essentials. Advanced adds workload, planning and GPA tools.
+        </p>
+      )}
+    </div>
+  );
+
   const sidebarFooter = (
     <div className="flex items-center justify-between gap-2 border-t border-hairline px-3 pb-4 pt-3">
       <ThemeToggle />
@@ -241,6 +295,7 @@ function Shell({ children }) {
           </p>
         </div>
         <nav className="flex-1 overflow-y-auto px-2 pb-4">{nav}</nav>
+        {viewToggle}
         {sidebarFooter}
       </aside>
 
@@ -276,6 +331,7 @@ function Shell({ children }) {
           <div className="rise absolute inset-y-0 left-0 flex w-64 flex-col border-r border-hairline bg-surface shadow-pop">
             <div className="px-5 pb-2 pt-6"><Brand /></div>
             <nav className="flex-1 overflow-y-auto px-2 pb-4">{nav}</nav>
+            {viewToggle}
             {sidebarFooter}
           </div>
         </div>
@@ -345,6 +401,7 @@ export default function App() {
           <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
           <Route path="/calendar" element={<Protected><Calendar /></Protected>} />
           <Route path="/completed" element={<Protected><Completed /></Protected>} />
+          <Route path="/gpa" element={<Protected><Gpa /></Protected>} />
           <Route path="/notifications" element={<Protected><Notifications /></Protected>} />
           <Route path="/focus" element={<Protected><Focus /></Protected>} />
           <Route path="/today" element={<Protected><Today /></Protected>} />

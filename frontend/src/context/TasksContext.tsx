@@ -10,7 +10,7 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useState,
 } from 'react';
-import { api, errorMessage } from '../lib/api';
+import { api, errorMessage, getToken } from '../lib/api';
 import { DEFAULT_WEIGHTS, normaliseWeights } from '../lib/priority';
 import { registerModuleColours } from '../lib/chartTheme';
 
@@ -68,6 +68,10 @@ export function TasksProvider({ children }: { children: any }) {
   }, []);
 
   useEffect(() => {
+    // This provider wraps every route, including /login and /register, so
+    // without the guard it fires three authenticated requests at a signed-out
+    // visitor — each one a 401, each one triggering a redirect.
+    if (!getToken()) { setLoading(false); return; }
     refresh();
     refreshPrefs();
     refreshModules();

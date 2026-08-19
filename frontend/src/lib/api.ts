@@ -75,8 +75,14 @@ api.interceptors.response.use(
       }
 
       setToken(null);
-      sessionStorage.setItem('deadlineiq.returnTo', window.location.pathname);
-      window.location.assign('/login');
+
+      // Redirecting to /login FROM /login is a reload loop: the page remounts,
+      // refetches, gets another 401, and redirects again — several times a
+      // second. Any expired token would trigger it, not just a stale one.
+      if (window.location.pathname !== '/login') {
+        sessionStorage.setItem('deadlineiq.returnTo', window.location.pathname);
+        window.location.assign('/login');
+      }
     }
 
     return Promise.reject(error);

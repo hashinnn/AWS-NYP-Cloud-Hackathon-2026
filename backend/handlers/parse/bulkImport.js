@@ -31,31 +31,47 @@ exports.handler = async (event) => {
 
   const now = new Date().toISOString();
 
+  // Same shape UC-002's create.js writes, so a task created via paste is
+  // indistinguishable from one created via the form once it lands in the
+  // table — same fields, same overdue handling, same scoring inputs.
   const prepared = body.rows.map((row) => {
     const defaults = smartDefaultsFor(row.type);
+    const overdue = Date.parse(row.dueAt) < Date.parse(now);
+
     return {
       taskId: crypto.randomUUID(),
       title: row.title,
       module: row.module ?? null,
       type: row.type,
       dueAt: row.dueAt,
-      gradeWeight: row.gradeWeight ?? null,
+      // Left *absent*, not null, when unknown: `Number(null)` is 0, which
+      // UC-009's Stakes would read as "worth 0% of the grade" rather than
+      // "not recorded" — skipping the Alt A neutral-50 substitution and its
+      // dataGap flag entirely (create.js §UC-002 makes the same choice).
+      gradeWeight: row.gradeWeight ?? undefined,
       effortHours: row.effortHours ?? defaults.effortHours,
-      prepDays: defaults.prepDays,
+      hoursSpent: 0,
+      progressPct: 0,
       isGroup: Boolean(row.isGroup),
       blockedOnTeammate: false,
-      status: 'active',
+      prepDays: defaults.prepDays,
+      status: overdue ? 'overdue' : 'active',
       notes: '',
-      progressPct: 0,
-      hoursSpent: 0,
-      source: 'paste',
       priorityScore: null,
       subScores: null,
       tight: false,
       dataGap: [],
-      history: [],
+      explanation: null,
+      explanationHash: null,
+      explanationStale: true,
+      s3Key: null,
+      source: 'paste',
       createdAt: now,
       updatedAt: now,
+      completedAt: null,
+      lateSubmission: false,
+      overdueSince: overdue ? row.dueAt : null,
+      history: [],
     };
   });
 

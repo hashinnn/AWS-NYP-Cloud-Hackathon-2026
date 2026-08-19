@@ -463,6 +463,7 @@ Resources:
   BriefsBucket:
     Type: AWS::S3::Bucket
     Properties:
+      BucketName: !Sub deadlineiq-briefs-${AWS::AccountId}-${AWS::Region}
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -493,15 +494,21 @@ Resources:
             Path: /api/briefs/presign
             Method: post
 
-  # UC-006 steps 4–5 — Class C: model behind a 6 s timeout, regex fallback
-  # behind that. 30 s per AGENTS §3 — the text budget plus the model call.
-  # Least privilege: none beyond logs — it reads text and returns a proposal.
+  # UC-006 steps 4–6 — extraction runs on text the browser already pulled out
+  # client-side (pdfjs-dist/mammoth). For a scanned/image brief (Alt A) it
+  # instead presigns a short-lived GET on the S3 object and sends that URL to
+  # a vision-capable model — the object bytes still never pass through this
+  # Lambda. 30 s per AGENTS §3 — the text budget plus the model call.
+  # Least privilege: s3:GetObject on BriefsBucket only (for the presign).
   BriefsExtractFunction:
     Type: AWS::Serverless::Function
     Properties:
       Handler: handlers/briefs/extract.handler
       Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
       Timeout: 30
+      Environment:
+        Variables:
+          S3_BUCKET: !Ref BriefsBucket
       Events:
         Extract:
           Type: Api
@@ -510,8 +517,9 @@ Resources:
             Path: /api/briefs/extract
             Method: post
 
-  # UC-005 — quick parse. Class C proposal only; nothing is written here.
-  # Least privilege: dynamodb:Query on the table (module codes for matching).
+  # UC-005 — quick parse. AI-first, chrono-node + regex fallback. Reads
+  # existing module codes/tasks for context (best-effort), never writes.
+  # Least privilege: dynamodb:Query on the table.
   QuickParseFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -543,8 +551,11 @@ Resources:
             Path: /api/parse/bulk
             Method: post
 
-  # UC-007 steps 5–7 — commit the ticked rows, then one scoring pass.
-  # Least privilege: dynamodb:BatchWriteItem, Query, UpdateItem on the table.
+  # UC-007 steps 5–7 — commits the ticked rows via BatchWriteItem, then
+  # rescores the full active set. The one write path in this track that does
+  # not go through /api/tasks (HLD's endpoint table only documents the
+  # preview step above; this sibling follows UC-012's generate → PUT shape).
+  # Least privilege: dynamodb:Query, BatchWriteItem, UpdateItem on the table.
   BulkImportFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -558,8 +569,10 @@ Resources:
             Path: /api/parse/bulk/import
             Method: post
 
-  # UC-008 — progress + study-hour logging. Class B write, then a rescore of
-  # the full active set. Least privilege: dynamodb:Query, UpdateItem.
+  # UC-008 — percentage slider and/or logged hours. Rescores the full active
+  # set (EffortPressure/ProgressDeficit both move). Milestone-driven progress
+  # goes through Hasini's milestones/patch.js instead (UC-012), not this.
+  # Least privilege: dynamodb:Query, UpdateItem on the table.
   ProgressFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -1051,3 +1064,7 @@ Outputs:
   ReminderTopicArn:
     Description: SNS topic reminders publish to (UC-019). Confirm the email subscription before the demo.
     Value: !Ref ReminderTopic
+
+  BriefsBucketName:
+    Description: S3 bucket for UC-006 assignment brief uploads.
+    Value: !Ref BriefsBucket

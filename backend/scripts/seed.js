@@ -108,6 +108,22 @@ function task(fields) {
   };
 }
 
+/**
+ * A finished task. Status, completedAt and lateSubmission are set explicitly
+ * rather than derived, because the point of these rows is the record they
+ * leave behind — the ranking ignores them entirely.
+ */
+function completed(fields) {
+  return {
+    ...task(fields),
+    status: 'completed',
+    progressPct: 100,
+    completedAt: iso(now - days(fields.completedDaysAgo ?? 7)),
+    lateSubmission: fields.lateSubmission ?? false,
+    overdueSince: null,
+  };
+}
+
 const TASKS = [
   // The centrepiece: 12 h of work, 15% done, three days left. At this
   // student's availability that is ~10.2 h remaining against ~7 h free —
@@ -174,6 +190,57 @@ const TASKS = [
     gradeWeight: 5,
     effortHours: 2,
     dueAt: iso(now - days(2)),
+  }),
+
+  // ── the record so far ────────────────────────────────────────────────
+  // Four finished tasks, because several features are inert without a
+  // history: UC-022 refuses to show an estimation-accuracy figure under
+  // three samples, that figure is what feeds UC-002's "you usually need
+  // about 1.3x your estimate" hint, and the companion's points are derived
+  // from completed work — with none, every shop item is locked.
+  //
+  // hoursSpent runs deliberately ~1.3x effortHours so the hint has something
+  // true to say. One is late, so the on-time rate is not a flat 100%.
+  completed({
+    taskId: 'seed-done-1',
+    title: 'SQL Fundamentals Quiz',
+    module: 'IT2214',
+    gradeWeight: 10,
+    effortHours: 3,
+    hoursSpent: 4,
+    dueAt: iso(now - days(6)),
+    completedDaysAgo: 6.2,
+  }),
+  completed({
+    taskId: 'seed-done-2',
+    title: 'Wireframe Assignment',
+    module: 'IT2216',
+    gradeWeight: 15,
+    effortHours: 6,
+    hoursSpent: 8,
+    dueAt: iso(now - days(9)),
+    completedDaysAgo: 9.1,
+  }),
+  completed({
+    taskId: 'seed-done-3',
+    title: 'Ethics Case Study',
+    module: 'IT2212',
+    gradeWeight: 15,
+    effortHours: 5,
+    hoursSpent: 7,
+    dueAt: iso(now - days(13)),
+    completedDaysAgo: 12.5,
+    lateSubmission: true,
+  }),
+  completed({
+    taskId: 'seed-done-4',
+    title: 'Subnetting Worksheet',
+    module: 'IT2213',
+    gradeWeight: 5,
+    effortHours: 2,
+    hoursSpent: 2.5,
+    dueAt: iso(now - days(16)),
+    completedDaysAgo: 16.3,
   }),
 ];
 

@@ -55,7 +55,7 @@ export default function Register() {
     <div className="flex min-h-screen items-center justify-center px-6">
       <form onSubmit={submit} className="w-full max-w-sm rounded-card border border-hairline bg-surface p-6">
         <span className="flex items-center gap-2 font-semibold tracking-tight text-ink">
-          <span className="grid size-6 place-items-center rounded-md bg-ink text-[11px] font-bold text-plane">
+          <span className="grid size-6 place-items-center rounded-md bg-accent text-[11px] font-bold text-plane">
             dIQ
           </span>
           DeadlineIQ
@@ -119,7 +119,7 @@ export default function Register() {
         <button
           type="submit"
           disabled={busy || password.length < MIN_PASSWORD || !displayName.trim() || !email.trim()}
-          className="mt-5 w-full rounded-lg bg-ink px-4 py-2.5 text-sm font-medium text-plane transition hover:opacity-90 disabled:opacity-50"
+          className="mt-5 w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-plane transition hover:opacity-90 disabled:opacity-50"
         >
           {busy ? 'Creating account…' : 'Create account'}
         </button>

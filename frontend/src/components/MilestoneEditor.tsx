@@ -156,7 +156,7 @@ export default function MilestoneEditor({
             <button
               type="button"
               onClick={makeSingleStep}
-              className="rounded-lg bg-ink px-3.5 py-2 text-sm font-medium text-plane transition hover:opacity-90"
+              className="rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-plane transition hover:opacity-90"
             >
               Track it as one step
             </button>
@@ -253,7 +253,7 @@ export default function MilestoneEditor({
           type="button"
           onClick={save}
           disabled={state === 'saving' || rows.length === 0}
-          className="rounded-lg bg-ink px-3.5 py-2 text-sm font-medium text-plane transition hover:opacity-90 disabled:opacity-50"
+          className="rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-plane transition hover:opacity-90 disabled:opacity-50"
         >
           {state === 'saving' ? 'Saving…' : 'Accept breakdown'}
         </button>

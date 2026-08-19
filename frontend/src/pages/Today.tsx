@@ -85,7 +85,7 @@ export default function Today() {
         {plan?.availableHours > 0 && (
           <div className="w-32">
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-hairline">
-              <div className="h-full rounded-full bg-ink" style={{ width: `${filled * 100}%` }} />
+              <div className="h-full rounded-full bg-accent" style={{ width: `${filled * 100}%` }} />
             </div>
             <p className="num mt-1 text-right text-[11px] text-muted">
               {formatHours(planned)} planned

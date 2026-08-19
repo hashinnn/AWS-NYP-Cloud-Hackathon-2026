@@ -365,7 +365,7 @@ export default function BriefUploadDialog({
                 type="button"
                 disabled={busy || !dueAt || !title.trim()}
                 onClick={confirm}
-                className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-plane disabled:opacity-50"
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-plane disabled:opacity-50"
               >
                 {busy ? 'Saving…' : 'Add task'}
               </button>

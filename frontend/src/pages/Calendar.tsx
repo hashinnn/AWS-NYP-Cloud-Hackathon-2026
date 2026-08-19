@@ -33,7 +33,7 @@ function weekStart(at: number) {
 }
 
 export default function Calendar() {
-  const [view, setView] = useState<View>('week');
+  const [view, setView] = useState<View>('month');
   const [offset, setOffset] = useState(0); // in whole ranges, from today
   const [data, setData] = useState<any>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -95,7 +95,7 @@ export default function Calendar() {
               type="button"
               onClick={() => { setView(value); setOffset(0); }}
               className={`rounded-lg px-2.5 py-1 text-sm capitalize transition ${
-                view === value ? 'bg-ink font-medium text-plane' : 'text-ink2 hover:text-ink'
+                view === value ? 'bg-accent font-medium text-plane' : 'text-ink2 hover:text-ink'
               }`}
             >
               {value}
@@ -205,7 +205,7 @@ export default function Calendar() {
             {/* Step 8 — today, as a line you can see the spans cross. */}
             {todayPct >= 0 && todayPct <= 100 && (
               <div
-                className="pointer-events-none absolute inset-y-0 z-10 w-px bg-ink"
+                className="pointer-events-none absolute inset-y-0 z-10 w-px bg-accent"
                 style={{ left: `calc(${todayPct}% )` }}
                 aria-hidden="true"
               />
@@ -263,7 +263,7 @@ export default function Calendar() {
                               key={milestone.milestoneId}
                               title={`${milestone.name}${milestone.hours ? ` — ${formatHours(milestone.hours)}` : ''}`}
                               className={`absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full border ${
-                                milestone.done ? 'bg-ink' : 'bg-surface'
+                                milestone.done ? 'bg-accent' : 'bg-surface'
                               }`}
                               style={{ left: `${within}%`, borderColor: 'var(--color-ink)' }}
                             />

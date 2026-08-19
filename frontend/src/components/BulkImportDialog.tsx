@@ -203,7 +203,7 @@ export default function BulkImportDialog({
                 type="button"
                 disabled={busy || !text.trim()}
                 onClick={() => parse(text)}
-                className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-plane disabled:opacity-50"
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-plane disabled:opacity-50"
               >
                 {busy ? 'Reading…' : 'Read these'}
               </button>
@@ -340,7 +340,7 @@ export default function BulkImportDialog({
                 type="button"
                 disabled={busy || ticked.length === 0}
                 onClick={doImport}
-                className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-plane disabled:opacity-50"
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-plane disabled:opacity-50"
               >
                 {busy ? 'Importing…' : `Import ${ticked.length} task${ticked.length === 1 ? '' : 's'}`}
               </button>
@@ -378,7 +378,7 @@ export default function BulkImportDialog({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-plane"
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-plane"
               >
                 Done
               </button>

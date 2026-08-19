@@ -285,7 +285,7 @@ export default function Notifications() {
             type="button"
             onClick={save}
             disabled={busy}
-            className="rounded-lg bg-ink px-3 py-1.5 text-sm font-medium text-plane transition hover:opacity-90 disabled:opacity-40"
+            className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-plane transition hover:opacity-90 disabled:opacity-40"
           >
             Save
           </button>
@@ -331,7 +331,7 @@ export default function Notifications() {
             type="button"
             onClick={() => exportIcs()}
             disabled={busy}
-            className="rounded-lg bg-ink px-3 py-1.5 text-sm font-medium text-plane disabled:opacity-40"
+            className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-plane disabled:opacity-40"
           >
             Download .ics
           </button>

@@ -15,6 +15,7 @@ import ModuleChip from './ModuleChip';
 import ProgressRing from './ProgressRing';
 import Countdown from './Countdown';
 import PriorityExplanation from './PriorityExplanation';
+import SubScoreBar from './SubScoreBar';
 import TypeIcon from './TypeIcon';
 
 export default function RankedRow({
@@ -56,13 +57,15 @@ export default function RankedRow({
   }
 
   return (
-    <li className={`transition-colors ${overdue ? 'bg-crittint/40' : 'hover:bg-surface'}`}>
-      <div className="flex items-center gap-3 px-2 py-3">
+    <li className={`transition-colors ${overdue ? 'bg-crittint/40' : 'hover:bg-plane/60'}`}>
+      <div className="flex items-center gap-3 px-4 py-3">
         <span
           className={`display num grid size-8 shrink-0 place-items-center rounded-full border text-[15px] ${
             overdue
               ? 'border-critical bg-critical text-plane'
-              : 'border-hairline bg-surface text-ink'
+              : rank === 1
+                ? 'border-ink bg-ink text-plane'
+                : 'border-hairline bg-plane text-ink'
           }`}
         >
           {overdue ? '!' : rank}
@@ -93,6 +96,13 @@ export default function RankedRow({
               <span className="ml-2 text-muted">score pending</span>
             )}
           </span>
+          {/* The product's signature, on every row: the same weighted bar the
+              explanation expands into, at whisper size. Colour = arithmetic. */}
+          {!open && task.subScores && contributions.length > 0 && (
+            <span className="mt-2 block max-w-64">
+              <SubScoreBar contributions={contributions} compact />
+            </span>
+          )}
         </button>
 
         <ProgressRing value={task.progressPct} label={`${task.progressPct || 0}% done`} />
@@ -102,7 +112,7 @@ export default function RankedRow({
       </div>
 
       {open && (
-        <div className="px-2 pb-4 pl-12">
+        <div className="px-4 pb-4 pl-[60px]">
           {task.subScores ? (
             <PriorityExplanation
               text={explanation?.text || null}

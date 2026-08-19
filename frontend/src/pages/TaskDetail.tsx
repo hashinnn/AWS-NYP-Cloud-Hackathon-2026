@@ -197,7 +197,7 @@ export default function TaskDetail() {
         <button
           type="button"
           onClick={() => (missing ? navigate('/tasks') : load())}
-          className="mt-5 rounded-lg bg-ink px-4 py-2 text-sm font-medium text-plane"
+          className="mt-5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-plane"
         >
           {missing ? 'Back to all tasks' : 'Try again'}
         </button>
@@ -531,7 +531,7 @@ export default function TaskDetail() {
               <button
                 type="button"
                 onClick={() => { save({ dueAt: pendingDeadline.dueAt }, { shiftMilestones: true }); setPendingDeadline(null); }}
-                className="rounded-lg bg-ink px-3 py-1.5 text-sm font-medium text-plane"
+                className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-plane"
               >
                 Shift them
               </button>

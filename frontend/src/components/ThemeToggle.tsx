@@ -62,7 +62,7 @@ export default function ThemeToggle() {
           title={option.label}
           onClick={() => choose(option.value)}
           className={`grid size-7 place-items-center rounded-md transition ${
-            choice === option.value ? 'bg-ink text-plane' : 'text-muted hover:text-ink'
+            choice === option.value ? 'bg-accent text-plane' : 'text-muted hover:text-ink'
           }`}
         >
           <svg

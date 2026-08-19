@@ -201,7 +201,7 @@ export default function Dashboard() {
                     )}
                   </div>
                   <h2 className="display mt-1.5 text-[30px] leading-[1.12] text-ink">{nextUp.title}</h2>
-                  <p className="display mt-1.5 text-lg text-ink2">
+                  <p className="mt-1.5 text-[15px]">
                     <Countdown type={nextUp.type} dueAt={nextUp.dueAt} status={nextUp.status} precise />
                   </p>
                   {nextUp.explanation && (
@@ -209,7 +209,7 @@ export default function Dashboard() {
                   )}
                   <Link
                     to="/focus"
-                    className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-sm font-medium text-plane transition hover:opacity-90"
+                    className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-plane transition hover:opacity-90"
                   >
                     Open Focus Mode
                     <span aria-hidden="true">→</span>
@@ -252,7 +252,7 @@ export default function Dashboard() {
                   ['Done', counts.completedThisWeek, 'text-goodtext'],
                 ].map(([label, value, tone]) => (
                   <div key={label as string}>
-                    <dd className={`display num text-xl ${tone}`}>{value as number}</dd>
+                    <dd className={`num text-lg font-semibold ${tone}`}>{value as number}</dd>
                     <dt className="text-[11px] text-muted">{label as string}</dt>
                   </div>
                 ))}
@@ -308,7 +308,7 @@ export default function Dashboard() {
                   type="button"
                   onClick={() => setView({ ...view, sort: sort.value })}
                   className={`rounded-lg px-2.5 py-1 text-sm transition ${
-                    view.sort === sort.value ? 'bg-ink font-medium text-plane' : 'text-ink2 hover:text-ink'
+                    view.sort === sort.value ? 'bg-accent font-medium text-plane' : 'text-ink2 hover:text-ink'
                   }`}
                 >
                   {sort.label}
@@ -321,7 +321,7 @@ export default function Dashboard() {
             <p className="mt-2 text-xs text-warntext">{degraded}</p>
           )}
 
-          <ul className="mt-3 divide-y divide-hairline border-y border-hairline">
+          <ul className="mt-3 divide-y divide-hairline overflow-hidden rounded-card border border-hairline bg-surface shadow-card">
             {/* E2 — one malformed task must cost one row, not the list. */}
             {shown.map((task: any, index: number) => (
               <RowBoundary

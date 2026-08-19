@@ -21,23 +21,23 @@ import { readToken } from './theme';
 export const PALETTE = {
   light: {
     series: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'],
-    plane: '#f9f9f7',
-    surface: '#fcfcfb',
-    ink: '#0b0b0b',
-    ink2: '#52514e',
-    muted: '#6e6c65', // darkened from the reference step to clear 4.5:1 as text
-    grid: '#e1e0d9',
-    axis: '#c3c2b7',
+    plane: '#f6f6f7',
+    surface: '#ffffff',
+    ink: '#09090b',
+    ink2: '#46464c',
+    muted: '#67676e', // clears 4.5:1 as text on surface and plane
+    grid: '#e7e7ea',
+    axis: '#c8c8ce',
   },
   dark: {
     series: ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'],
-    plane: '#0d0d0d',
-    surface: '#1a1a19',
-    ink: '#ffffff',
-    ink2: '#c3c2b7',
-    muted: '#898781',
-    grid: '#2c2c2a',
-    axis: '#383835',
+    plane: '#09090b',
+    surface: '#151518',
+    ink: '#fafafa',
+    ink2: '#c9c9cf',
+    muted: '#96969e',
+    grid: '#252529',
+    axis: '#3a3a40',
   },
 } as const;
 

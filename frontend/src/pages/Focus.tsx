@@ -251,7 +251,7 @@ export default function Focus() {
       <article className="rise rounded-card border border-hairline bg-surface shadow-card">
         <div className="flex items-center justify-between gap-3 border-b border-hairline px-6 py-3">
           <div className="flex items-center gap-2">
-            <span className="num rounded-md bg-ink px-1.5 py-0.5 text-xs font-semibold text-plane">
+            <span className="display num rounded-md bg-accent px-2 py-0.5 text-sm text-plane">
               #{current.rank || index + 1}
             </span>
             <ModuleChip code={task.module} />
@@ -316,7 +316,7 @@ export default function Focus() {
                 <button
                   type="button"
                   onClick={() => logProgress({ progressPct: progressValue })}
-                  className="rounded-lg bg-ink px-3 py-1.5 text-sm font-medium text-plane transition hover:opacity-90"
+                  className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-plane transition hover:opacity-90"
                 >
                   Save progress
                 </button>

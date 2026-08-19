@@ -117,7 +117,7 @@ export default function Settings() {
                   onClick={() => setDraft(PRESETS[name])}
                   className={`rounded-full border px-3 py-1.5 text-sm transition ${
                     activePreset === name
-                      ? 'border-ink bg-ink text-plane'
+                      ? 'border-accent bg-accent text-plane'
                       : 'border-hairline text-ink2 hover:bg-plane hover:text-ink'
                   }`}
                 >
@@ -132,7 +132,7 @@ export default function Settings() {
               type="button"
               onClick={save}
               disabled={saving}
-              className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-plane transition hover:opacity-90 disabled:opacity-50"
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-plane transition hover:opacity-90 disabled:opacity-50"
             >
               {saving ? 'Saving…' : 'Save weightings'}
             </button>

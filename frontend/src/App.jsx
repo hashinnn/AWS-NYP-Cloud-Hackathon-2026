@@ -78,7 +78,7 @@ function NavIcon({ d }) {
 function Brand() {
   return (
     <span className="flex items-center gap-2.5">
-      <span className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-ink shadow-lift">
+      <span className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-accent shadow-lift">
         {/* The mark is the product: five weighted bars, one verdict. */}
         <svg viewBox="0 0 24 24" className="size-5" aria-hidden="true">
           <g fill="var(--color-plane)">
@@ -167,6 +167,7 @@ function CreatedToast({ result, onDismiss }) {
 
 function Shell({ children }) {
   const { logout } = useAuth();
+  const { ranking } = useTasks();
   const [adding, setAdding] = useState(false);
   const [formInitial, setFormInitial] = useState(null);   // UC-005/006 prefill
   const [bulk, setBulk] = useState(null);                 // UC-007: {seedText}
@@ -188,6 +189,10 @@ function Shell({ children }) {
     if (mode === 'paste') setBulk({ seedText: '' });
   }), []);
 
+  // UC-021 step 2 — overdue is never hidden, so the nav itself carries the
+  // count until every one of them has been resolved.
+  const overdueCount = (ranking || []).filter((task) => task.status === 'overdue').length;
+
   const nav = NAV_GROUPS.map(([group, links]) => (
     <div key={group}>
       <p className="px-3 pb-1.5 pt-5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
@@ -198,14 +203,19 @@ function Shell({ children }) {
           key={to}
           to={to}
           onClick={() => setMenuOpen(false)}
-          className={({ isActive }) => `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition ${
+          className={({ isActive }) => `group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition ${
             isActive
-              ? 'bg-ink text-plane shadow-lift'
-              : 'text-ink2 hover:bg-surface hover:text-ink'
+              ? 'bg-accent text-plane shadow-lift'
+              : 'text-ink2 hover:bg-plane hover:text-ink'
           }`}
         >
           <NavIcon d={icon} />
-          {label}
+          <span className="transition-transform group-hover:translate-x-0.5">{label}</span>
+          {label === 'Dashboard' && overdueCount > 0 && (
+            <span className="num ml-auto rounded-full bg-crittint px-1.5 py-px text-[10px] font-semibold text-crittext">
+              {overdueCount}
+            </span>
+          )}
         </NavLink>
       ))}
     </div>
@@ -223,7 +233,7 @@ function Shell({ children }) {
   return (
     <div className="min-h-screen lg:flex">
       {/* ── the rail (lg and up) ─────────────────────────────────────────── */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-hairline bg-surface/70 backdrop-blur lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-hairline bg-surface lg:flex">
         <div className="px-5 pb-2 pt-6">
           <Brand />
           <p className="mt-2 text-[11px] leading-snug text-muted">
@@ -250,7 +260,7 @@ function Shell({ children }) {
         <button
           type="button"
           onClick={() => openForm()}
-          className="ml-auto rounded-lg bg-ink px-3 py-1.5 text-sm font-medium text-plane"
+          className="ml-auto rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-plane"
         >
           Add
         </button>
@@ -286,7 +296,7 @@ function Shell({ children }) {
             <button
               type="button"
               onClick={() => openForm()}
-              className="hidden shrink-0 rounded-lg bg-ink px-3.5 py-2 text-sm font-medium text-plane transition hover:opacity-90 lg:block"
+              className="hidden shrink-0 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-plane transition hover:opacity-90 lg:block"
             >
               Add task
             </button>

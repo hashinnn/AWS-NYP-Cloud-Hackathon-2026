@@ -91,7 +91,7 @@ export default function QuickAddBar({
           <button
             type="submit"
             disabled={busy}
-            className="shrink-0 rounded-lg bg-ink px-2.5 py-1 text-xs font-medium text-plane disabled:opacity-50"
+            className="shrink-0 rounded-lg bg-accent px-2.5 py-1 text-xs font-medium text-plane disabled:opacity-50"
           >
             {busy ? 'Reading…' : 'Parse ↵'}
           </button>

@@ -93,7 +93,7 @@ export default function CrashWeekCard({
               type="button"
               onClick={apply}
               disabled={busy !== null}
-              className="rounded-lg bg-ink px-3.5 py-2 text-sm font-medium text-plane transition hover:opacity-90 disabled:opacity-50"
+              className="rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-plane transition hover:opacity-90 disabled:opacity-50"
             >
               {busy === 'apply' ? 'Applying…' : 'Apply this plan'}
             </button>

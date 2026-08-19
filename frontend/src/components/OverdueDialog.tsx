@@ -134,7 +134,7 @@ export default function OverdueDialog({
             type="button"
             onClick={resolve}
             disabled={busy || (action === 'reschedule' && !newDueAt)}
-            className="rounded-lg bg-ink px-3 py-1.5 text-sm font-medium text-plane transition hover:opacity-90 disabled:opacity-40"
+            className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-plane transition hover:opacity-90 disabled:opacity-40"
           >
             {busy ? 'Saving…' : 'Confirm'}
           </button>

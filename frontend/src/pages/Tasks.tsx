@@ -63,7 +63,7 @@ export default function Tasks() {
               type="button"
               onClick={() => setStatus(filter.value)}
               className={`rounded-lg px-2.5 py-1 text-sm transition ${
-                status === filter.value ? 'bg-ink font-medium text-plane' : 'text-ink2 hover:text-ink'
+                status === filter.value ? 'bg-accent font-medium text-plane' : 'text-ink2 hover:text-ink'
               }`}
             >
               {filter.label}

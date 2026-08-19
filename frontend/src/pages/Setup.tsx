@@ -203,7 +203,7 @@ export default function Setup() {
         <button
           type="submit"
           disabled={busy || code.trim().length < 2}
-          className="rounded-lg bg-ink px-3 py-2 text-sm font-medium text-plane disabled:opacity-50"
+          className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-plane disabled:opacity-50"
         >
           Add
         </button>
@@ -301,7 +301,7 @@ export default function Setup() {
             save({ blockedDates: next });
             setNewDate('');
           }}
-          className="rounded-lg bg-ink px-3 py-2 text-sm font-medium text-plane disabled:opacity-50"
+          className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-plane disabled:opacity-50"
         >
           Block
         </button>

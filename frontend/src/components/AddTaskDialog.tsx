@@ -267,7 +267,7 @@ export default function AddTaskDialog(
                 type="button"
                 disabled={busy}
                 onClick={() => send()}
-                className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-plane disabled:opacity-50"
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-plane disabled:opacity-50"
               >
                 {busy ? 'Saving…' : 'Record as overdue'}
               </button>
@@ -299,7 +299,7 @@ export default function AddTaskDialog(
                 type="button"
                 disabled={busy}
                 onClick={() => send({ createAnyway: true })}
-                className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-plane disabled:opacity-50"
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-plane disabled:opacity-50"
               >
                 {busy ? 'Saving…' : 'Create anyway'}
               </button>
@@ -346,7 +346,7 @@ export default function AddTaskDialog(
                   onClick={() => setType(option.value)}
                   className={`rounded-lg px-3 py-1.5 text-sm transition ${
                     type === option.value
-                      ? 'bg-ink font-medium text-plane'
+                      ? 'bg-accent font-medium text-plane'
                       : 'border border-hairline text-ink2 hover:text-ink'
                   }`}
                 >
@@ -415,7 +415,7 @@ export default function AddTaskDialog(
                         }}
                         className={`num rounded-lg px-3 py-1.5 text-sm transition ${
                           selected
-                            ? 'bg-ink font-medium text-plane'
+                            ? 'bg-accent font-medium text-plane'
                             : 'border border-warning text-ink2 hover:text-ink'
                         }`}
                       >
@@ -581,7 +581,7 @@ export default function AddTaskDialog(
               <button
                 type="submit"
                 disabled={busy}
-                className="rounded-lg bg-ink px-4 py-2.5 text-sm font-medium text-plane transition hover:opacity-90 disabled:opacity-50"
+                className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-plane transition hover:opacity-90 disabled:opacity-50"
               >
                 {busy ? 'Saving…' : 'Add task'}
               </button>

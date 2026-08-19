@@ -267,6 +267,129 @@ Resources:
   # S3 bucket + presign, UC-005 parse, UC-006 briefs/extract, UC-007 bulk
   # import, UC-008 progress. Put S3_BUCKET on your own functions' Environment.
 
+  # --- S3: assignment brief uploads (UC-006) --------------------------------
+  #
+  # Presigned PUT only — the bucket itself never needs a public policy. CORS
+  # is scoped to the exact frontend origin, matching the API Gateway rule
+  # (AGENTS §13 — never '*').
+  BriefsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub deadlineiq-briefs-${AWS::AccountId}-${AWS::Region}
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins: [!Ref FrontendUrl]
+            AllowedMethods: [PUT]
+            AllowedHeaders: ['*']
+            MaxAge: 300
+
+  # UC-005 — quick parse. AI-first, chrono-node + regex fallback. Reads
+  # existing module codes/tasks for context (best-effort), never writes.
+  # Least privilege: dynamodb:Query on the table.
+  QuickParseFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/parse/quick.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        QuickParse:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/parse
+            Method: post
+
+  # UC-007 step 1–4 — the bulk-paste review table. Proposal only.
+  # Least privilege: dynamodb:Query on the table.
+  BulkParseFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/parse/bulk.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        BulkParse:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/parse/bulk
+            Method: post
+
+  # UC-007 steps 5–7 — commits the ticked rows via BatchWriteItem, then
+  # rescores the full active set. The one write path in this track that does
+  # not go through /api/tasks (HLD's endpoint table only documents the
+  # preview step above; this sibling follows UC-012's generate → PUT shape).
+  # Least privilege: dynamodb:Query, BatchWriteItem, UpdateItem on the table.
+  BulkImportFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/parse/bulkImport.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        BulkImport:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/parse/bulk/import
+            Method: post
+
+  # UC-006 step 2 — a presigned PUT so the file goes straight to S3 and never
+  # touches this Lambda. 5-minute expiry, 5 MB cap enforced by the handler.
+  # Least privilege: s3:PutObject on BriefsBucket only.
+  BriefsPresignFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/briefs/presign.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Environment:
+        Variables:
+          S3_BUCKET: !Ref BriefsBucket
+      Events:
+        BriefsPresign:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/briefs/presign
+            Method: post
+
+  # UC-006 steps 4–6 — extraction runs on text the browser already pulled out
+  # client-side (pdfjs-dist/mammoth). For a scanned/image brief (Alt A) it
+  # instead presigns a short-lived GET on the S3 object and sends that URL to
+  # a vision-capable model — the object bytes still never pass through this
+  # Lambda. No table access needed at all — a proposal, nothing written.
+  # Least privilege: s3:GetObject on BriefsBucket only (for the presign).
+  BriefsExtractFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/briefs/extract.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Environment:
+        Variables:
+          S3_BUCKET: !Ref BriefsBucket
+      Events:
+        BriefsExtract:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/briefs/extract
+            Method: post
+
+  # UC-008 — percentage slider and/or logged hours. Rescores the full active
+  # set (EffortPressure/ProgressDeficit both move). Milestone-driven progress
+  # goes through Hasini's milestones/patch.js instead (UC-012), not this.
+  # Least privilege: dynamodb:GetItem, Query, UpdateItem on the table.
+  LogProgressFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/progress/logProgress.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        LogProgress:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/tasks/{taskId}/progress
+            Method: post
+
   # ==========================================================================
   # ===== HASINI =============================================================
   # ==========================================================================
@@ -288,3 +411,7 @@ Outputs:
   TableName:
     Description: DynamoDB table name.
     Value: !Ref DeadlineIqTable
+
+  BriefsBucketName:
+    Description: S3 bucket for UC-006 assignment brief uploads.
+    Value: !Ref BriefsBucket

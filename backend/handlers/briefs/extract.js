@@ -16,6 +16,8 @@ const schema = require('./schema');
 const { chat, isConfigured, AiUnavailable } = require('../../lib/ai/client');
 const { extractJson } = require('../../lib/ai/validate');
 const prompt = require('../../lib/ai/prompts/extract');
+const visionPrompt = require('../../lib/ai/prompts/extractVision');
+const { presignGet } = require('../../lib/s3/presignGet');
 const { detectDueAt, detectGradeWeight } = require('../../lib/parse/deterministic');
 
 const TZ = 'Asia/Singapore';
@@ -23,9 +25,12 @@ const TZ = 'Asia/Singapore';
 // First ~2 pages, where deadlines almost always appear (HLD §6.2 step 4).
 const TEXT_BUDGET_CHARS = 6000;
 
-// UC-006 step 3 — under this, the frontend should have routed to the vision
-// path already; if it still lands here, there is nothing to extract from.
+// UC-006 step 3 — the frontend's own threshold for routing to the vision
+// path (Alt A). Mirrored here because a scanned PDF can still arrive with
+// a few stray characters of extracted text rather than exactly zero.
 const MIN_TEXT_CHARS = 50;
+
+const IMAGE_KEY = /\.(?:png|jpe?g)$/i;
 
 function scalarField(value, confidence, source) {
   return { value: value ?? null, confidence, ...(source ? { source } : {}) };
@@ -78,14 +83,43 @@ exports.handler = async (event) => {
   if (errors) return fail(400, 'validation_failed', errors[0].message);
 
   const fullText = body.extractedText.trim();
+  const nowMs = Date.now();
+  const now = new Date(nowMs).toISOString();
+
+  // Alt A — a scanned or image-based document yields little to no
+  // client-side text (UC-006 step 3). Route to a vision-capable model
+  // before giving up, rather than sending the student straight to E2.
+  if (fullText.length < MIN_TEXT_CHARS && IMAGE_KEY.test(body.s3Key) && isConfigured()) {
+    try {
+      const imageUrl = await presignGet(body.s3Key);
+      const raw = await chat(visionPrompt.buildMessages({ imageUrl, now, tz: TZ }), { maxTokens: 500 });
+      const parsed = extractJson(raw);
+      if (visionPrompt.isValidShape(parsed)) {
+        return ok(200, toResponse(parsed, false));
+      }
+      console.warn(JSON.stringify({ level: 'WARN', event: 'extract_vision_bad_shape', userId, s3Key: body.s3Key }));
+    } catch (error) {
+      if (!(error instanceof AiUnavailable)) throw error;
+      console.warn(JSON.stringify({
+        level: 'WARN', event: 'extract_vision_unavailable', reason: error.reason, s3Key: body.s3Key,
+      }));
+      // E5 — same partial-result contract as the text path's timeout case.
+      // Nothing to regex-fallback from an image, so the "partial" result is
+      // just the (empty) shape the review screen already knows how to render.
+      if (error.reason === 'timeout') {
+        return ok(504, toResponse(extractDeterministic('', nowMs), true));
+      }
+    }
+    // Any other vision failure falls through to E2 below, same as a document
+    // that genuinely has no readable text.
+  }
+
   if (fullText.length < MIN_TEXT_CHARS) {
     return fail(422, 'no_text_found',
       "I couldn't read this document — try entering the details yourself.");
   }
 
   const text = fullText.slice(0, TEXT_BUDGET_CHARS);
-  const nowMs = Date.now();
-  const now = new Date(nowMs).toISOString();
 
   if (isConfigured()) {
     try {

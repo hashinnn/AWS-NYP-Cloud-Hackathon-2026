@@ -159,6 +159,20 @@ export default function TaskDetail() {
     }
   }
 
+  /** UC-012 step 7 — milestones are tickable wherever they are shown, and
+      ticking drives the parent's progressPct, which rescores the whole set. */
+  async function toggleMilestone(milestone: any) {
+    try {
+      await api.patch(`/api/tasks/${taskId}/milestones/${milestone.milestoneId}`, {
+        completedAt: milestone.completedAt ? null : new Date().toISOString(),
+      });
+      await load();
+      refresh();
+    } catch (error) {
+      setProblem(errorMessage(error, 'Could not update that step.'));
+    }
+  }
+
   async function undoDelete() {
     try {
       const response = await api.post(`/api/tasks/${taskId}/restore`);
@@ -405,17 +419,27 @@ export default function TaskDetail() {
           <h2 className={labelClass}>Milestones</h2>
           <ul className="mt-2 divide-y divide-hairline border-y border-hairline">
             {milestones.map((milestone) => (
-              <li key={milestone.milestoneId} className="flex items-center gap-3 py-2 text-sm">
-                <span className={milestone.completedAt ? 'text-muted line-through' : 'text-ink'}>
-                  {milestone.name}
-                </span>
-                <span className="num ml-auto text-xs text-muted">{milestone.hours} h</span>
-                <span className="num w-24 text-right text-xs text-muted">
-                  {formatDate(milestone.dueAt)}
-                </span>
+              <li key={milestone.milestoneId} className="py-2 text-sm">
+                <label className="flex cursor-pointer items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(milestone.completedAt)}
+                    onChange={() => toggleMilestone(milestone)}
+                  />
+                  <span className={milestone.completedAt ? 'text-muted line-through' : 'text-ink'}>
+                    {milestone.name}
+                  </span>
+                  <span className="num ml-auto text-xs text-muted">{milestone.hours} h</span>
+                  <span className="num w-24 text-right text-xs text-muted">
+                    {formatDate(milestone.dueAt)}
+                  </span>
+                </label>
               </li>
             ))}
           </ul>
+          <p className="mt-1.5 text-xs text-muted">
+            Ticking a step updates this task’s progress and re-ranks everything.
+          </p>
         </section>
       )}
 

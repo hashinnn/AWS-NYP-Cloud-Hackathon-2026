@@ -12,6 +12,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, errorMessage } from '../lib/api';
 import { formatDate } from '../lib/countdown';
 
@@ -376,9 +377,22 @@ export default function Notifications() {
                 <span className="rounded-full bg-plane px-1.5 py-0.5 text-[10px] font-medium text-ink2">
                   {RULE_LABELS[notification.rule] || notification.rule}
                 </span>
-                <span className={`text-sm ${notification.readAt ? 'text-ink2' : 'font-medium text-ink'}`}>
-                  {notification.subject}
-                </span>
+                {/* A reminder you cannot act on is noise — the subject opens
+                    the task it is nagging about. */}
+                {notification.taskId ? (
+                  <Link
+                    to={`/tasks/${notification.taskId}`}
+                    className={`text-sm underline-offset-2 hover:underline ${
+                      notification.readAt ? 'text-ink2' : 'font-medium text-ink'
+                    }`}
+                  >
+                    {notification.subject}
+                  </Link>
+                ) : (
+                  <span className={`text-sm ${notification.readAt ? 'text-ink2' : 'font-medium text-ink'}`}>
+                    {notification.subject}
+                  </span>
+                )}
                 {notification.absorbed && (
                   <span className="rounded-full bg-warntint px-1.5 py-0.5 text-[10px] text-warntext" title="Held by your daily cap — it goes out with the next digest">
                     held for the next digest

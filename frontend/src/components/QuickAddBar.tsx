@@ -120,8 +120,23 @@ export default function QuickAddBar({
         </button>
       </form>
       {problem && (
-        <p className="absolute left-0 top-full z-10 mt-1 rounded-lg border border-hairline bg-surface px-3 py-1.5 text-xs text-crittext shadow-card">
-          {problem}
+        <p className="absolute left-0 top-full z-10 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-hairline bg-surface px-3 py-1.5 text-xs shadow-card">
+          <span className="text-crittext">{problem}</span>
+          {/* E3 is never a dead end — the typed text rides into the form. */}
+          <button
+            type="button"
+            onClick={() => {
+              onParsed({
+                title: text.trim().slice(0, 200),
+                notice: 'Couldn’t read that as a task — fill in the details yourself.',
+              });
+              setText('');
+              setProblem(null);
+            }}
+            className="font-medium text-ink underline underline-offset-2"
+          >
+            Use the full form instead
+          </button>
         </p>
       )}
     </div>

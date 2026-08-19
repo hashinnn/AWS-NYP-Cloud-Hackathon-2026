@@ -18,7 +18,8 @@
 const http = require('node:http');
 const path = require('node:path');
 
-const PORT = Number(process.env.DEV_API_PORT) || 3001;
+// PORT is honoured too, so a second instance can run alongside the default.
+const PORT = Number(process.env.DEV_API_PORT || process.env.PORT) || 3001;
 const BACKEND = path.join(__dirname, '..');
 const USER = 'demo-user';
 
@@ -43,14 +44,26 @@ const task = (o) => ({
   ...o,
 });
 
+const module_ = (code, name, colour, totalWeight = 100) => ({
+  PK: `USER#${USER}`, SK: `MODULE#${code}`, code, name, colour, totalWeight,
+});
+
+const milestone = (taskId, milestoneId, o) => ({
+  PK: `USER#${USER}`, SK: `MILESTONE#${taskId}#${milestoneId}`, taskId, milestoneId, ...o,
+});
+
 // The HLD §13.3 demo shape: a tight 40% report, a test with prep days, a
-// blocked group project, two clashing small tasks, and one overdue item.
+// blocked group project, two clashing small tasks, and one overdue item —
+// PLUS the texture of an account that has been used all semester: named
+// modules, milestones mid-flight, hours logged, a completed history and an
+// inbox. The invariants above are load-bearing for the demo; the texture is
+// what makes the screens read as a product rather than a fixture.
 let ITEMS = [
   {
     PK: `USER#${USER}`,
     SK: 'PROFILE',
     userId: USER,
-    displayName: 'Demo Student',
+    displayName: 'Alex Tan',
     email: 'demo@nyp.edu.sg',
     tz: 'Asia/Singapore',
   },
@@ -60,28 +73,141 @@ let ITEMS = [
     availability: {
       mon: 3, tue: 3, wed: 2, thu: 3, fri: 2, sat: 5, sun: 4,
     },
-    blockedDates: [],
+    availabilitySetAt: iso(now - days(30)),
+    blockedDates: [iso(now + days(6)).slice(0, 10)],   // work shift this weekend
     weights: {
       urgency: 0.30, stakes: 0.25, effortPressure: 0.20, progressDeficit: 0.15, clashPenalty: 0.10,
     },
   },
+
+  // ── modules (UC-004) — colours are light-palette steps, resolved to slots ──
+  module_('IT2214', 'Database Systems', '#2a78d6'),
+  module_('IT2213', 'Networking Fundamentals', '#eb6834'),
+  module_('IT2212', 'Professional Ethics', '#1baf7a'),
+  module_('IT2216', 'Full-Stack Development', '#eda100'),
+  module_('IT2215', 'Agile Team Project', '#e87ba4'),
+
+  // ── the active week ──
   task({
-    taskId: 't-report', title: 'Database Report', module: 'IT2214', gradeWeight: 40, effortHours: 12, progressPct: 15, dueAt: iso(now + days(3)),
+    taskId: 't-report',
+    title: 'Database Report',
+    module: 'IT2214',
+    gradeWeight: 40,
+    effortHours: 12,
+    progressPct: 15,
+    hoursSpent: 2,
+    dueAt: iso(now + days(3)),
+    notes: 'ERD + normalisation write-up. Prof wants the query plans annotated.',
+    history: [
+      { at: iso(now - days(2)), field: 'progressPct', from: 0, to: 15 },
+    ],
   }),
   task({
-    taskId: 't-test', title: 'Networking Test', module: 'IT2213', type: 'test', gradeWeight: 25, effortHours: 6, prepDays: 3, dueAt: iso(now + days(5)),
+    taskId: 't-test',
+    title: 'Networking Test',
+    module: 'IT2213',
+    type: 'test',
+    gradeWeight: 25,
+    effortHours: 6,
+    prepDays: 3,
+    dueAt: iso(now + days(5)),
+    notes: 'Covers subnetting, TCP handshake, and the OSI layers. Past papers on Brightspace.',
   }),
   task({
     taskId: 't-quiz', title: 'Ethics Quiz', module: 'IT2212', gradeWeight: 5, effortHours: 2, dueAt: iso(now + days(2)),
   }),
   task({
-    taskId: 't-lab', title: 'Lab Worksheet 4', module: 'IT2216', gradeWeight: 10, effortHours: 3, dueAt: iso(now + days(4)),
+    taskId: 't-lab', title: 'Lab Worksheet 4', module: 'IT2216', gradeWeight: 10, effortHours: 3, progressPct: 30, hoursSpent: 1, dueAt: iso(now + days(4)),
   }),
   task({
-    taskId: 't-group', title: 'Group Project Build', module: 'IT2215', type: 'project', gradeWeight: 30, effortHours: 30, isGroup: true, blockedOnTeammate: true, dueAt: iso(now + days(11)),
+    taskId: 't-group',
+    title: 'Group Project Build',
+    module: 'IT2215',
+    type: 'project',
+    gradeWeight: 30,
+    effortHours: 30,
+    progressPct: 20,
+    hoursSpent: 6,
+    isGroup: true,
+    blockedOnTeammate: true,
+    dueAt: iso(now + days(11)),
+    notes: 'Waiting on Daniel’s API branch before the frontend can integrate.',
   }),
   task({
     taskId: 't-late', title: 'Tutorial Submission', module: 'IT2212', status: 'overdue', gradeWeight: 5, effortHours: 2, dueAt: iso(now - days(2)), overdueSince: iso(now - days(2)),
+  }),
+  task({
+    taskId: 't-pitch',
+    title: 'Sprint Review Presentation',
+    module: 'IT2215',
+    type: 'presentation',
+    gradeWeight: 10,
+    effortHours: 5,
+    prepDays: 1,
+    dueAt: iso(now + days(14)),
+  }),
+
+  // ── the report, broken down (UC-012) — first step already done ──
+  milestone('t-report', 'm-erd', {
+    name: 'Draft the ER diagram', hours: 2, order: 1, dueAt: iso(now + days(0.5)), completedAt: iso(now - days(1)),
+  }),
+  milestone('t-report', 'm-write', {
+    name: 'Write normalisation section', hours: 6, order: 2, dueAt: iso(now + days(1.5)), completedAt: null,
+  }),
+  milestone('t-report', 'm-queries', {
+    name: 'Annotate query plans and revise', hours: 4, order: 3, dueAt: iso(now + days(2)), completedAt: null,
+  }),
+
+  // ── the record so far (UC-022) — estimates run ~1.3× reality here, which
+  //    is what makes the estimation-accuracy hint appear on the next create ──
+  task({
+    taskId: 't-done-1',
+    title: 'SQL Fundamentals Quiz',
+    module: 'IT2214',
+    status: 'completed',
+    gradeWeight: 10,
+    effortHours: 3,
+    hoursSpent: 4,
+    progressPct: 100,
+    dueAt: iso(now - days(6)),
+    completedAt: iso(now - days(6.2)),
+  }),
+  task({
+    taskId: 't-done-2',
+    title: 'Wireframe Assignment',
+    module: 'IT2216',
+    status: 'completed',
+    gradeWeight: 15,
+    effortHours: 6,
+    hoursSpent: 8,
+    progressPct: 100,
+    dueAt: iso(now - days(9)),
+    completedAt: iso(now - days(9.1)),
+  }),
+  task({
+    taskId: 't-done-3',
+    title: 'Ethics Case Study',
+    module: 'IT2212',
+    status: 'completed',
+    gradeWeight: 15,
+    effortHours: 5,
+    hoursSpent: 7,
+    progressPct: 100,
+    dueAt: iso(now - days(13)),
+    completedAt: iso(now - days(12.5)),
+    lateSubmission: true,
+  }),
+  task({
+    taskId: 't-done-4',
+    title: 'Subnetting Worksheet',
+    module: 'IT2213',
+    status: 'completed',
+    gradeWeight: 5,
+    effortHours: 2,
+    hoursSpent: 2.5,
+    progressPct: 100,
+    dueAt: iso(now - days(16)),
+    completedAt: iso(now - days(16.3)),
   }),
 ];
 
@@ -176,7 +302,36 @@ stub('lib/dynamo/prefs.js', {
 // The reminder pipeline is stubbed at exactly the same seam as everything
 // else: the conditional write is honoured, so UC-019 E3 (a duplicate
 // EventBridge invocation sending nothing twice) is demonstrable locally.
-let NOTIFS = [];
+// The inbox arrives lived-in: yesterday's digest already read, today's nudge
+// and escalation waiting — the state UC-019 would have produced overnight.
+const notif = (daysAgo, taskId, rule, subject, body, readAt) => {
+  const date = iso(now - days(daysAgo)).slice(0, 10);
+  return {
+    PK: `USER#${USER}`,
+    SK: `NOTIF#${date}#${taskId || rule}#${rule}`,
+    userId: USER,
+    date,
+    taskId,
+    rule,
+    subject,
+    body,
+    delivered: true,
+    createdAt: iso(now - days(daysAgo)),
+    readAt: readAt || null,
+  };
+};
+
+let NOTIFS = [
+  notif(1, null, 'digest', 'Your day: 3 priorities, 1 overdue',
+    'Today’s plan: Database Report (2 h), Networking Test revision (1.5 h). '
+    + 'Top 3: Database Report, Tutorial Submission, Networking Test. '
+    + 'Overdue — resolve first: Tutorial Submission.', iso(now - days(0.9))),
+  notif(0.2, 't-quiz', 'same_day_nudge', 'Ethics Quiz is due in 20 hours',
+    'Ethics Quiz (IT2212) is due in 20 hours and is at 0% — about 2 hours of work remain.'),
+  notif(0.1, 't-report', 'escalation', 'You’re behind on Database Report',
+    'You’re 25% behind pace on Database Report, due in 3 days. 10 hours of work remain '
+    + 'against 11 free hours before the deadline.'),
+];
 let FEED = new Map();
 
 stub('lib/dynamo/notifications.js', {
@@ -299,6 +454,31 @@ const server = http.createServer(async (req, res) => {
   for await (const chunk of req) body += chunk;
 
   // ── other members' endpoints, faked just enough to render ──
+  // UC-006 steps 1–2 without AWS: a fake presign pointing back at this server,
+  // and a PUT sink that accepts the upload and discards it. The real handler
+  // needs a real bucket and credentials, so it stays untouched.
+  if (req.method === 'POST' && url.pathname === '/api/briefs/presign') {
+    const parsed = JSON.parse(body || '{}');
+    if (Number(parsed.sizeBytes) > 5 * 1024 * 1024) {
+      res.writeHead(400, cors);
+      return res.end(JSON.stringify({
+        code: 'file_too_large',
+        message: 'Please upload a PDF, Word document or image under 5 MB.',
+      }));
+    }
+    const key = `briefs/${USER}/dev-${Date.now()}-${String(parsed.filename || 'brief')}`;
+    res.writeHead(200, cors);
+    return res.end(JSON.stringify({
+      uploadUrl: `http://localhost:${PORT}/dev/upload/${encodeURIComponent(key)}`,
+      s3Key: key,
+      expiresIn: 300,
+    }));
+  }
+  if (req.method === 'PUT' && url.pathname.startsWith('/dev/upload/')) {
+    res.writeHead(200, cors);
+    return res.end('');
+  }
+
   if (url.pathname === '/api/auth/login' || url.pathname === '/api/auth/register') {
     res.writeHead(200, cors);
     return res.end(JSON.stringify({
@@ -338,8 +518,14 @@ const server = http.createServer(async (req, res) => {
         requestContext: { authorizer: { userId: USER } },
       });
       // A handler that sets its own Content-Type means it (`text/calendar`,
-      // `text/csv`) — do not overwrite it with the JSON default.
-      res.writeHead(result.statusCode, { ...cors, ...(result.headers || {}) });
+      // `text/csv`) — do not overwrite it with the JSON default. The handler's
+      // CORS origin (FRONTEND_URL, exact in production) IS overwritten: the
+      // dev frontend may sit on any port, and this server is dev-only.
+      res.writeHead(result.statusCode, {
+        ...cors,
+        ...(result.headers || {}),
+        'Access-Control-Allow-Origin': '*',
+      });
       return res.end(result.body || '');
     } catch (error) {
       console.error('handler threw:', url.pathname, error);

@@ -36,31 +36,96 @@ const SHOWS_PREP_DAYS = new Set(['test', 'presentation']);
 const labelClass = 'block text-sm text-ink2';
 const inputClass = 'mt-1 w-full rounded-lg border border-hairline bg-plane px-3 py-2 text-ink';
 const errorInputClass = 'mt-1 w-full rounded-lg border border-critical bg-plane px-3 py-2 text-ink';
+const amberInputClass = 'mt-1 w-full rounded-lg border border-warning bg-plane px-3 py-2 text-ink';
 
 function Suggested() {
   return <span className="ml-1.5 rounded-full bg-plane px-1.5 py-0.5 text-[10px] font-medium text-muted">suggested</span>;
 }
 
+/**
+ * UC-005 steps 5–7 — what the parser proposed, carried into the form so this
+ * one dialog is also the confirmation card: every field editable, fields
+ * below 0.7 confidence highlighted amber with the source phrase beneath.
+ */
+export type ParsedPrefill = {
+  title?: string | null;
+  module?: string | null;
+  type?: string | null;
+  dueAt?: string | null;            // ISO — split into the date/time inputs
+  gradeWeight?: number | null;
+  effortHours?: number | null;
+  isGroup?: boolean | null;
+  notes?: string | null;
+  source?: 'nl' | 'brief';
+  s3Key?: string | null;
+  confidence?: Record<string, number>;
+  sources?: Record<string, string>;
+  dueAtCandidates?: string[];       // Alt A — both readings of an ambiguous day
+  notice?: string;                  // Alt B — "Smart parsing unavailable…"
+};
+
+const AMBER_BELOW = 0.7;
+
+function splitIso(iso?: string | null) {
+  if (!iso || !Number.isFinite(Date.parse(iso))) return null;
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return {
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  };
+}
+
 export default function AddTaskDialog(
-  { onClose, onCreated }: { onClose: () => void; onCreated: (result: any) => void },
+  { onClose, onCreated, initial }: {
+    onClose: () => void;
+    onCreated: (result: any) => void;
+    initial?: ParsedPrefill;
+  },
 ) {
   const { ranking, refresh } = useTasks();
   const navigate = useNavigate();
 
-  const [type, setType] = useState('assignment');
-  const [title, setTitle] = useState('');
-  const [module, setModule] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [dueTime, setDueTime] = useState('23:59');   // the polytechnic norm
-  const [gradeWeight, setGradeWeight] = useState('');
-  const [effortHours, setEffortHours] = useState(String(SMART_DEFAULTS.assignment.effortHours));
-  const [prepDays, setPrepDays] = useState(String(SMART_DEFAULTS.assignment.prepDays));
-  const [isGroup, setIsGroup] = useState(false);
-  const [notes, setNotes] = useState('');
+  const parsedDue = splitIso(initial?.dueAt);
+  const initialType = initial?.type && SMART_DEFAULTS[initial.type] ? initial.type : 'assignment';
+
+  const [type, setType] = useState(initialType);
+  const [title, setTitle] = useState(initial?.title || '');
+  const [module, setModule] = useState(initial?.module || '');
+  const [dueDate, setDueDate] = useState(parsedDue?.date || '');
+  const [dueTime, setDueTime] = useState(parsedDue?.time || '23:59');   // the polytechnic norm
+  const [gradeWeight, setGradeWeight] = useState(
+    initial?.gradeWeight === undefined || initial?.gradeWeight === null ? '' : String(initial.gradeWeight),
+  );
+  const [effortHours, setEffortHours] = useState(
+    String(initial?.effortHours ?? SMART_DEFAULTS[initialType].effortHours),
+  );
+  const [prepDays, setPrepDays] = useState(String(SMART_DEFAULTS[initialType].prepDays));
+  const [isGroup, setIsGroup] = useState(Boolean(initial?.isGroup));
+  const [notes, setNotes] = useState(initial?.notes || '');
 
   // Which numbers are still the system's guess rather than the student's.
-  const [effortTouched, setEffortTouched] = useState(false);
+  const [effortTouched, setEffortTouched] = useState(initial?.effortHours != null);
   const [prepTouched, setPrepTouched] = useState(false);
+
+  // Amber clears per field the moment the student corrects it — an edited
+  // value is theirs, not the parser's guess any more.
+  const [corrected, setCorrected] = useState<Record<string, boolean>>({});
+
+  const amber = (field: string) => Boolean(
+    initial?.confidence
+    && initial.confidence[field] !== undefined
+    && initial.confidence[field] < AMBER_BELOW
+    && !corrected[field],
+  );
+  const sourceOf = (field: string) => (amber(field) ? initial?.sources?.[field] : undefined);
+  const markCorrected = (field: string) => setCorrected((c) => ({ ...c, [field]: true }));
+
+  const classFor = (field: string, hasError: boolean) => {
+    if (hasError) return errorInputClass;
+    if (amber(field)) return amberInputClass;
+    return inputClass;
+  };
 
   // UC-022 steps 4–5 (Zoe) — how far this student's estimates usually sit from
   // reality, offered here as a suggestion. Fetched once per dialog; a failure
@@ -134,6 +199,9 @@ export default function AddTaskDialog(
         ...(SHOWS_PREP_DAYS.has(type) && prepDays !== '' ? { prepDays: Number(prepDays) } : {}),
         isGroup,
         ...(notes.trim() ? { notes: notes.trim() } : {}),
+        // UC-005/UC-006 — the capture route this confirmation came through.
+        ...(initial?.source ? { source: initial.source } : {}),
+        ...(initial?.s3Key ? { s3Key: initial.s3Key } : {}),
         ...extra,
       });
 
@@ -249,11 +317,25 @@ export default function AddTaskDialog(
         {stage === 'form' && (
           <form onSubmit={submit} noValidate>
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-ink">Add task</h2>
+              <h2 className="text-lg font-semibold text-ink">
+                {initial?.source ? 'Check the details' : 'Add task'}
+              </h2>
               <button type="button" onClick={onClose} className="text-sm text-muted hover:text-ink">
                 Close
               </button>
             </div>
+
+            {/* UC-005 Alt B / UC-006 E2 — the parse degraded; say so. */}
+            {initial?.notice && (
+              <p className="mt-3 rounded-lg bg-warntint px-3 py-2 text-xs text-warntext">
+                {initial.notice}
+              </p>
+            )}
+            {initial?.source && !initial?.notice && (
+              <p className="mt-2 text-xs text-muted">
+                Amber fields are the parser’s less-confident guesses — everything is editable.
+              </p>
+            )}
 
             {/* Type first: it drives every suggestion below it. */}
             <div className="mt-4 flex flex-wrap gap-1.5">
@@ -279,13 +361,16 @@ export default function AddTaskDialog(
                 id="task-title"
                 ref={titleRef}
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => { setTitle(e.target.value); markCorrected('title'); }}
                 aria-invalid={Boolean(errors.title)}
-                className={errors.title ? errorInputClass : inputClass}
+                className={classFor('title', Boolean(errors.title))}
                 maxLength={200}
               />
             </label>
             {errors.title && <p className="mt-1 text-xs text-crittext">{errors.title}</p>}
+            {sourceOf('title') && (
+              <p className="mt-1 text-xs text-warntext">from “{sourceOf('title')}”</p>
+            )}
 
             <label className="mt-3 block" htmlFor="task-module">
               <span className={labelClass}>Module</span>
@@ -293,17 +378,55 @@ export default function AddTaskDialog(
                 id="task-module"
                 list="known-modules"
                 value={module}
-                onChange={(e) => setModule(e.target.value)}
-                className={inputClass}
+                onChange={(e) => { setModule(e.target.value); markCorrected('module'); }}
+                className={classFor('module', false)}
                 placeholder="e.g. IT2214"
                 maxLength={20}
               />
             </label>
+            {sourceOf('module') && (
+              <p className="mt-1 text-xs text-warntext">from “{sourceOf('module')}”</p>
+            )}
             <datalist id="known-modules">
               {knownModules.map((code) => <option key={code} value={code} />)}
             </datalist>
             {isNewModule && (
               <p className="mt-1 text-xs text-muted">Will create module {typedCode}.</p>
+            )}
+
+            {/* Alt A — a bare weekday is genuinely ambiguous; both readings
+                are offered as explicit dates rather than silently guessed. */}
+            {initial?.dueAtCandidates && initial.dueAtCandidates.length > 1 && (
+              <div className="mt-3">
+                <span className={labelClass}>Which date did you mean?</span>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {initial.dueAtCandidates.map((candidate) => {
+                    const split = splitIso(candidate);
+                    if (!split) return null;
+                    const selected = split.date === dueDate && split.time === dueTime;
+                    return (
+                      <button
+                        key={candidate}
+                        type="button"
+                        onClick={() => {
+                          setDueDate(split.date);
+                          setDueTime(split.time);
+                          markCorrected('dueAt');
+                        }}
+                        className={`num rounded-lg px-3 py-1.5 text-sm transition ${
+                          selected
+                            ? 'bg-ink font-medium text-plane'
+                            : 'border border-warning text-ink2 hover:text-ink'
+                        }`}
+                      >
+                        {new Date(candidate).toLocaleDateString(undefined, {
+                          weekday: 'short', day: 'numeric', month: 'short',
+                        })}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             )}
 
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -314,9 +437,9 @@ export default function AddTaskDialog(
                   ref={dateRef}
                   type="date"
                   value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
+                  onChange={(e) => { setDueDate(e.target.value); markCorrected('dueAt'); }}
                   aria-invalid={Boolean(errors.dueDate)}
-                  className={errors.dueDate ? errorInputClass : inputClass}
+                  className={classFor('dueAt', Boolean(errors.dueDate))}
                 />
               </label>
               <label className="block" htmlFor="task-time">
@@ -328,14 +451,24 @@ export default function AddTaskDialog(
                   id="task-time"
                   type="time"
                   value={dueTime}
-                  onChange={(e) => setDueTime(e.target.value)}
+                  onChange={(e) => { setDueTime(e.target.value); markCorrected('dueAt'); }}
                   className={inputClass}
                 />
               </label>
             </div>
             {errors.dueDate && <p className="mt-1 text-xs text-crittext">{errors.dueDate}</p>}
+            {sourceOf('dueAt') && dueDate && (
+              <p className="mt-1 text-xs text-warntext">
+                “{sourceOf('dueAt')}” → {new Date(`${dueDate}T${dueTime || '23:59'}`).toLocaleString(undefined, {
+                  day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                })}
+              </p>
+            )}
             {isPast && !errors.dueDate && (
-              <p className="mt-1 text-xs text-warntext">That date has already passed.</p>
+              <p className="mt-1 text-xs text-warntext">
+                That date has already passed
+                {initial?.source ? ' — did you mean next year, or are you recording an overdue task?' : '.'}
+              </p>
             )}
 
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -347,8 +480,8 @@ export default function AddTaskDialog(
                   min={0}
                   max={100}
                   value={gradeWeight}
-                  onChange={(e) => setGradeWeight(e.target.value)}
-                  className={inputClass}
+                  onChange={(e) => { setGradeWeight(e.target.value); markCorrected('gradeWeight'); }}
+                  className={classFor('gradeWeight', false)}
                   placeholder="from module"
                 />
               </label>
@@ -364,11 +497,18 @@ export default function AddTaskDialog(
                   max={200}
                   step={0.5}
                   value={effortHours}
-                  onChange={(e) => { setEffortTouched(true); setEffortHours(e.target.value); }}
-                  className={inputClass}
+                  onChange={(e) => { setEffortTouched(true); setEffortHours(e.target.value); markCorrected('effortHours'); }}
+                  className={classFor('effortHours', false)}
                 />
               </label>
             </div>
+            {(sourceOf('gradeWeight') || sourceOf('effortHours')) && (
+              <p className="mt-1 text-xs text-warntext">
+                {[sourceOf('gradeWeight') && `weight from “${sourceOf('gradeWeight')}”`,
+                  sourceOf('effortHours') && `effort from “${sourceOf('effortHours')}”`,
+                ].filter(Boolean).join(' · ')}
+              </p>
+            )}
 
             {/* UC-022 step 4 — the figure is only offered once it is real
                 (three completed tasks with hours logged) and only when it

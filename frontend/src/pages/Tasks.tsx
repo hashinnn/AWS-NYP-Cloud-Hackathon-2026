@@ -52,7 +52,7 @@ export default function Tasks() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-semibold tracking-tight text-ink">Tasks</h1>
+        <h1 className="display text-[26px] leading-tight text-ink">Tasks</h1>
         <span className="num text-sm text-muted">{tasks.length}</span>
 
         {/* Wraps under the heading rather than pushing five buttons off-screen. */}

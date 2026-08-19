@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, errorMessage } from '../lib/api';
+import { openCapture } from '../lib/capture';
 import { useTasks } from '../context/TasksContext';
 import { formatHours } from '../lib/countdown';
 import { capacityColour } from '../lib/chartTheme';
@@ -107,7 +108,7 @@ export default function Dashboard() {
 
     return (
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-        <h1 className="text-xl font-semibold tracking-tight text-ink">Dashboard</h1>
+        <h1 className="display text-[26px] leading-tight text-ink">Dashboard</h1>
 
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-card border border-warning/40 bg-warntint px-4 py-3">
           <p className="text-sm text-warntext">
@@ -147,7 +148,12 @@ export default function Dashboard() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="text-xl font-semibold tracking-tight text-ink">Dashboard</h1>
+        <div>
+          <h1 className="display text-[26px] leading-tight text-ink">Dashboard</h1>
+          <p className="mt-0.5 text-sm text-muted">
+            {new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
+          </p>
+        </div>
         <Link to="/calendar" className="text-sm text-ink2 underline underline-offset-2">
           Calendar and timeline
         </Link>
@@ -159,15 +165,20 @@ export default function Dashboard() {
           <h2 className="text-base font-semibold text-ink">Add your first deadline</h2>
           <p className="mt-1 text-sm text-muted">Three ways in — all of them end in a confirmation you can edit.</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            {[
-              ['Type it', 'Quick-add understands “report due next Friday 11:59pm, 30% of IT2214”.'],
-              ['Upload a brief', 'Pull the deadline, weighting and deliverables out of a PDF.'],
-              ['Full form', 'Every field, with sensible defaults by task type.'],
-            ].map(([title, hint]) => (
-              <div key={title} className="rounded-lg border border-hairline p-3">
+            {([
+              ['Type it', 'Quick-add understands “report due next Friday 11:59pm, 30% of IT2214”.', 'nl'],
+              ['Upload a brief', 'Pull the deadline, weighting and deliverables out of a PDF.', 'brief'],
+              ['Full form', 'Every field, with sensible defaults by task type.', 'form'],
+            ] as const).map(([title, hint, mode]) => (
+              <button
+                key={title}
+                type="button"
+                onClick={() => openCapture(mode)}
+                className="rounded-lg border border-hairline p-3 text-left transition hover:border-ink"
+              >
                 <p className="text-sm font-medium text-ink">{title}</p>
                 <p className="mt-1 text-xs text-muted">{hint}</p>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -181,26 +192,27 @@ export default function Dashboard() {
               <p className="text-[11px] font-medium uppercase tracking-wide text-muted">Next up</p>
               {nextUp ? (
                 <>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2">
                     <ModuleChip code={nextUp.module} />
-                    <h2 className="text-lg font-semibold text-ink">{nextUp.title}</h2>
                     {nextUp.status === 'overdue' && (
                       <span className="rounded-full bg-crittint px-2 py-0.5 text-[11px] font-medium text-crittext">
                         overdue
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-sm">
+                  <h2 className="display mt-1.5 text-[30px] leading-[1.12] text-ink">{nextUp.title}</h2>
+                  <p className="display mt-1.5 text-lg text-ink2">
                     <Countdown type={nextUp.type} dueAt={nextUp.dueAt} status={nextUp.status} precise />
                   </p>
                   {nextUp.explanation && (
-                    <p className="mt-3 text-[15px] leading-relaxed text-ink2">{nextUp.explanation}</p>
+                    <p className="mt-3 max-w-prose text-[15px] leading-relaxed text-ink2">{nextUp.explanation}</p>
                   )}
                   <Link
                     to="/focus"
-                    className="mt-4 inline-block rounded-lg bg-ink px-3 py-1.5 text-sm font-medium text-plane transition hover:opacity-90"
+                    className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-sm font-medium text-plane transition hover:opacity-90"
                   >
                     Open Focus Mode
+                    <span aria-hidden="true">→</span>
                   </Link>
                 </>
               ) : (
@@ -211,9 +223,9 @@ export default function Dashboard() {
 
             <section className="rounded-card border border-hairline bg-surface p-5 shadow-card">
               <p className="text-[11px] font-medium uppercase tracking-wide text-muted">This week</p>
-              <p className="num mt-2 text-2xl font-semibold text-ink">
+              <p className="display num mt-2 text-[28px] text-ink">
                 {formatHours(thisWeek.required)}
-                <span className="text-base font-normal text-muted"> / {formatHours(thisWeek.available)}</span>
+                <span className="text-base text-muted"> / {formatHours(thisWeek.available)}</span>
               </p>
 
               <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-hairline">
@@ -240,7 +252,7 @@ export default function Dashboard() {
                   ['Done', counts.completedThisWeek, 'text-goodtext'],
                 ].map(([label, value, tone]) => (
                   <div key={label as string}>
-                    <dd className={`num text-lg font-semibold ${tone}`}>{value as number}</dd>
+                    <dd className={`display num text-xl ${tone}`}>{value as number}</dd>
                     <dt className="text-[11px] text-muted">{label as string}</dt>
                   </div>
                 ))}

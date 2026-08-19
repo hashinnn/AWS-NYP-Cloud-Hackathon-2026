@@ -141,7 +141,7 @@ export default function Workload() {
     <section className="mx-auto max-w-5xl px-6 py-8">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-ink">Workload</h1>
+          <h1 className="display text-[26px] leading-tight text-ink">Workload</h1>
           <p className="mt-0.5 text-sm text-ink2">
             The next 12 weeks — hours of work against hours you actually have
           </p>

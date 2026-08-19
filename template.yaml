@@ -455,6 +455,124 @@ Resources:
   # S3 bucket + presign, UC-005 parse, UC-006 briefs/extract, UC-007 bulk
   # import, UC-008 progress. Put S3_BUCKET on your own functions' Environment.
 
+  # --- S3: assignment brief uploads (UC-006) --------------------------------
+  #
+  # Files arrive on a presigned PUT straight from the browser, so the bucket
+  # needs CORS for the frontend origin. Objects are keyed briefs/<userId>/…
+  # and the bucket stays private — the presigned URL is the only way in.
+  BriefsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins: [!Ref FrontendUrl]
+            AllowedMethods: [PUT]
+            AllowedHeaders: ['*']
+            MaxAge: 300
+
+  # UC-006 step 2 — presigned PUT, 5-minute expiry, 5 MB cap (validated in
+  # the handler). Least privilege: s3:PutObject on BriefsBucket.
+  BriefsPresignFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/briefs/presign.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Environment:
+        Variables:
+          S3_BUCKET: !Ref BriefsBucket
+      Events:
+        Presign:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/briefs/presign
+            Method: post
+
+  # UC-006 steps 4–5 — Class C: model behind a 6 s timeout, regex fallback
+  # behind that. 30 s per AGENTS §3 — the text budget plus the model call.
+  # Least privilege: none beyond logs — it reads text and returns a proposal.
+  BriefsExtractFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/briefs/extract.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Timeout: 30
+      Events:
+        Extract:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/briefs/extract
+            Method: post
+
+  # UC-005 — quick parse. Class C proposal only; nothing is written here.
+  # Least privilege: dynamodb:Query on the table (module codes for matching).
+  QuickParseFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/parse/quick.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Timeout: 15
+      Events:
+        QuickParse:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/parse
+            Method: post
+
+  # UC-007 steps 1–4 — the batched review-table parse. One model call for the
+  # whole paste, chrono-node per line when it is unavailable (E3).
+  # Least privilege: dynamodb:Query on the table.
+  BulkParseFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/parse/bulk.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Timeout: 15
+      Events:
+        BulkParse:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/parse/bulk
+            Method: post
+
+  # UC-007 steps 5–7 — commit the ticked rows, then one scoring pass.
+  # Least privilege: dynamodb:BatchWriteItem, Query, UpdateItem on the table.
+  BulkImportFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/parse/bulkImport.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        BulkImport:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/parse/bulk/import
+            Method: post
+
+  # UC-008 — progress + study-hour logging. Class B write, then a rescore of
+  # the full active set. Least privilege: dynamodb:Query, UpdateItem.
+  ProgressFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/progress/logProgress.handler
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${LambdaRoleName}
+      Events:
+        LogProgress:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DeadlineIqApi
+            Path: /api/tasks/{taskId}/progress
+            Method: post
+
   # ==========================================================================
   # ===== HASINI =============================================================
   # ==========================================================================

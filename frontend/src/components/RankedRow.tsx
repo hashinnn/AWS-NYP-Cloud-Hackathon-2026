@@ -15,13 +15,7 @@ import ModuleChip from './ModuleChip';
 import ProgressRing from './ProgressRing';
 import Countdown from './Countdown';
 import PriorityExplanation from './PriorityExplanation';
-
-const TYPE_ICON: Record<string, string> = {
-  assignment: '📄',
-  test: '📝',
-  project: '🧩',
-  presentation: '🎤',
-};
+import TypeIcon from './TypeIcon';
 
 export default function RankedRow({
   task, rank, weights, onResolve,
@@ -62,11 +56,13 @@ export default function RankedRow({
   }
 
   return (
-    <li className={overdue ? 'bg-crittint/40' : ''}>
-      <div className="flex items-baseline gap-3 px-2 py-3">
+    <li className={`transition-colors ${overdue ? 'bg-crittint/40' : 'hover:bg-surface'}`}>
+      <div className="flex items-center gap-3 px-2 py-3">
         <span
-          className={`num w-7 shrink-0 rounded-md py-0.5 text-center text-sm font-semibold ${
-            overdue ? 'bg-critical text-plane' : 'bg-plane text-ink'
+          className={`display num grid size-8 shrink-0 place-items-center rounded-full border text-[15px] ${
+            overdue
+              ? 'border-critical bg-critical text-plane'
+              : 'border-hairline bg-surface text-ink'
           }`}
         >
           {overdue ? '!' : rank}
@@ -74,7 +70,7 @@ export default function RankedRow({
 
         <button type="button" onClick={expand} className="min-w-0 flex-1 text-left">
           <span className="flex flex-wrap items-center gap-2">
-            <span aria-hidden="true">{TYPE_ICON[task.type] || '•'}</span>
+            <TypeIcon type={task.type} className="size-4 text-muted" />
             <ModuleChip code={task.module} size="sm" />
             <span className="truncate text-sm font-medium text-ink">{task.title}</span>
             {task.tight && (
@@ -100,7 +96,7 @@ export default function RankedRow({
         </button>
 
         <ProgressRing value={task.progressPct} label={`${task.progressPct || 0}% done`} />
-        <span className="num w-9 shrink-0 text-right text-sm font-medium text-ink">
+        <span className="display num w-11 shrink-0 text-right text-[17px] text-ink">
           {task.priorityScore ?? '—'}
         </span>
       </div>

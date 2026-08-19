@@ -63,7 +63,7 @@ export default function SubScoreBar({
             }`}
             style={{
               width: `${(c.weighted / sum) * 100}%`,
-              backgroundColor: SUBSCORE_COLOURS[c.key] || '#898781',
+              backgroundColor: SUBSCORE_COLOURS[c.key] || 'var(--color-muted)',
               opacity: hovered && hovered !== c.key ? 0.32 : 1,
             }}
             onMouseEnter={() => setHovered(c.key)}
@@ -90,7 +90,7 @@ export default function SubScoreBar({
               >
                 <span
                   className="inline-block size-2 rounded-full"
-                  style={{ backgroundColor: SUBSCORE_COLOURS[c.key] || '#898781' }}
+                  style={{ backgroundColor: SUBSCORE_COLOURS[c.key] || 'var(--color-muted)' }}
                 />
                 {SUBSCORE_LABELS[c.key] || c.key}
                 <span className="num font-medium">{c.weighted.toFixed(1)}</span>

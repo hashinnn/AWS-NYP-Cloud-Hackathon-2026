@@ -8,12 +8,13 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, errorCode, errorMessage } from '../lib/api';
 import { contributionsOf } from '../lib/priority';
 import { formatDate } from '../lib/countdown';
 import { useTasks } from '../context/TasksContext';
 import PriorityExplanation from '../components/PriorityExplanation';
+import MilestoneEditor from '../components/MilestoneEditor';
 import ModuleChip from '../components/ModuleChip';
 
 const TYPES = ['assignment', 'test', 'project', 'presentation'];
@@ -39,10 +40,16 @@ function splitLocal(iso: string) {
 export default function TaskDetail() {
   const { taskId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { weights, refresh, ranking, prefs } = useTasks();
+
+  // UC-006 step 9 — deliverables extracted from the brief travel here and
+  // pre-seed the milestone proposal instead of being discarded.
+  const deliverables: string[] = (location.state as any)?.deliverables || [];
 
   const [task, setTask] = useState<any>(null);
   const [milestones, setMilestones] = useState<any[]>([]);
+  const [breakingDown, setBreakingDown] = useState(false);
   const [explanation, setExplanation] = useState<any>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [conflict, setConflict] = useState(false);
@@ -409,6 +416,37 @@ export default function TaskDetail() {
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {/* UC-012 step 1 — "Break this down", from the task itself. Deliverables
+          that arrived from a brief (UC-006) open the proposal straight away. */}
+      {milestones.length === 0 && ['active', 'overdue'].includes(task.status) && (
+        <section className="mt-6">
+          {breakingDown || deliverables.length > 0 ? (
+            <MilestoneEditor
+              task={task}
+              deliverables={deliverables}
+              onSaved={() => {
+                setBreakingDown(false);
+                navigate('.', { replace: true, state: {} });   // consume the hand-off
+                load();
+                refresh();
+              }}
+              onCancel={() => {
+                setBreakingDown(false);
+                navigate('.', { replace: true, state: {} });
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setBreakingDown(true)}
+              className="rounded-lg border border-hairline px-3 py-1.5 text-sm text-ink2 transition hover:text-ink"
+            >
+              Break this into steps
+            </button>
+          )}
         </section>
       )}
 

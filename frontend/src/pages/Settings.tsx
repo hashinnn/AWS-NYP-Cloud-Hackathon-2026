@@ -69,7 +69,7 @@ export default function Settings() {
   return (
     <section className="mx-auto max-w-5xl px-6 py-8">
       <header>
-        <h1 className="text-xl font-semibold tracking-tight text-ink">Prioritisation</h1>
+        <h1 className="display text-[26px] leading-tight text-ink">Prioritisation</h1>
         <p className="mt-0.5 max-w-2xl text-sm text-ink2">
           These five numbers are the whole ranking. Move one and the order below changes
           immediately — nothing is sent anywhere until you save.

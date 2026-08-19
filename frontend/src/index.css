@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Bundled, not fetched — the demo must not depend on venue wifi for its own
+   typeface. Inter carries the UI; Fraunces carries the display voice. */
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/fraunces";
+
 /**
  * Design tokens. These mirror `lib/chartTheme.ts` exactly — the charts and the
  * chrome around them are one system, so a card and the chart inside it never
@@ -68,13 +73,16 @@
   --color-band-crash: #fae3e3;
   --color-band-unavailable: #f0efec;
 
-  --radius-card: 14px;
-  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius-card: 16px;
+  --font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Fraunces Variable", Georgia, "Times New Roman", serif;
 
   /* Defined here rather than inline: an arbitrary shadow containing rgba()
      commas does not survive Tailwind's class parser. */
   --shadow-card: 0 1px 2px rgba(11, 11, 11, 0.04), 0 10px 28px -14px rgba(11, 11, 11, 0.16);
   --shadow-lift: 0 1px 2px rgba(11, 11, 11, 0.05);
+  --shadow-pop: 0 1px 2px rgba(11, 11, 11, 0.06), 0 8px 20px -6px rgba(11, 11, 11, 0.14),
+    0 24px 50px -18px rgba(11, 11, 11, 0.22);
 }
 
 :root {
@@ -178,8 +186,34 @@ html {
 
 body {
   background-color: var(--color-plane);
+  /* The faintest vertical wash keeps large empty regions from reading flat. */
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--color-surface) 55%, var(--color-plane)) 0,
+    var(--color-plane) 420px
+  );
+  background-repeat: no-repeat;
   color: var(--color-ink);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-ink);
+  color: var(--color-plane);
+}
+
+/*
+ * The display voice — page titles, hero countdowns, rank numerals, the
+ * priority score. A soft-serif at low optical size is what separates this
+ * chrome from every stock dashboard; everything else stays in Inter.
+ */
+.display {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 28, "SOFT" 60, "WONK" 0;
+  font-weight: 560;
+  letter-spacing: -0.01em;
 }
 
 /* Numbers that sit in columns or change in place must not jitter. */

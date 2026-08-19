@@ -170,7 +170,7 @@ export default function Notifications() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
-      <h1 className="text-xl font-semibold tracking-tight text-ink">Notifications</h1>
+      <h1 className="display text-[26px] leading-tight text-ink">Notifications</h1>
       <p className="mt-1 text-sm text-muted">
         At most {prefs.dailyCap} a day. Anything over the cap is folded into the next digest rather
         than dropped, and nothing is delivered during quiet hours.

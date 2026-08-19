@@ -30,6 +30,12 @@ const createTask = z.object({
   moduleName: z.string().trim().max(100).optional(),
   // Alt B — the student saw the near-duplicate warning and chose "Create anyway".
   createAnyway: z.boolean().optional(),
+
+  // UC-005/UC-006 — the capture route the confirmed proposal came through.
+  // 'form' is the default and 'paste' has its own bulk-import write path.
+  source: z.enum(['nl', 'brief']).optional(),
+  // UC-006 step 8 — the uploaded brief this task was extracted from.
+  s3Key: z.string().max(500).nullish(),
 });
 
 /**

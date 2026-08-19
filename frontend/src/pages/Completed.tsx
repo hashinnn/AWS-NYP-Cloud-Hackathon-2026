@@ -42,7 +42,7 @@ export default function Completed() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-      <h1 className="text-xl font-semibold tracking-tight text-ink">Completed</h1>
+      <h1 className="display text-[26px] leading-tight text-ink">Completed</h1>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
         <Stat

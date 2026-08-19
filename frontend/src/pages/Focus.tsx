@@ -183,7 +183,7 @@ export default function Focus() {
             <path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </span>
-        <h1 className="mt-4 text-xl font-semibold text-ink">{data?.message}</h1>
+        <h1 className="display mt-4 text-[26px] text-ink">{data?.message}</h1>
         {data?.nextStartBy && (
           <p className="mt-1.5 text-sm text-ink2">
             Next thing to start: {formatDay(data.nextStartBy)}
@@ -266,13 +266,15 @@ export default function Focus() {
           )}
         </div>
 
-        <div className="px-6 py-6">
-          <h1 className="text-2xl leading-tight font-semibold tracking-tight text-ink">
+        <div className="px-6 py-7">
+          <h1 className="display text-[34px] leading-[1.1] text-ink">
             {current.milestone ? current.milestone.name : task.title}
           </h1>
-          <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-sm text-muted">
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 text-sm text-muted">
             {current.milestone && <span>next step of {task.title} ·</span>}
-            <span className="num">{countdownText(current.milestone?.dueAt || task.dueAt)}</span>
+            <span className="display num text-lg text-ink2">
+              {countdownText(current.milestone?.dueAt || task.dueAt)}
+            </span>
           </p>
 
           <div className="mt-6">

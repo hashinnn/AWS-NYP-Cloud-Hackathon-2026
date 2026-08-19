@@ -5,10 +5,10 @@
  * preference and a two-state toggle silently overrides it.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { applyTheme, getTheme, type ThemeChoice } from '../lib/theme';
 
-const OPTIONS: Array<{ value: ThemeChoice; label: string; icon: JSX.Element }> = [
+const OPTIONS: Array<{ value: ThemeChoice; label: string; icon: ReactElement }> = [
   {
     value: 'light',
     label: 'Light',

@@ -76,7 +76,7 @@ export default function Today() {
     <section className="mx-auto max-w-2xl px-6 py-8">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-ink">Today</h1>
+          <h1 className="display text-[26px] leading-tight text-ink">Today</h1>
           <p className="num mt-0.5 text-sm text-ink2">
             {formatHours(plan?.availableHours || 0)} of study time
             {plan?.spareHours > 0 ? ` · ${formatHours(plan.spareHours)} spare` : ''}

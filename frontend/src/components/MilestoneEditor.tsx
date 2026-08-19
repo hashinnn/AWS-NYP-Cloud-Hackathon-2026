@@ -35,11 +35,13 @@ function rebalance(rows: any[], changedIndex: number, effortHours: number) {
 }
 
 export default function MilestoneEditor({
-  task, onSaved, onCancel,
+  task, onSaved, onCancel, deliverables,
 }: {
   task: any;
   onSaved?: (milestones: any[]) => void;
   onCancel?: () => void;
+  /** UC-006 step 9 — deliverables extracted from the brief, pre-seeding the proposal. */
+  deliverables?: string[];
 }) {
   const [rows, setRows] = useState<any[]>([]);
   const [source, setSource] = useState<'ai' | 'template' | null>(null);
@@ -47,9 +49,15 @@ export default function MilestoneEditor({
   const [problem, setProblem] = useState<string | null>(null);
   const [tooSmall, setTooSmall] = useState(false);
 
+  // The generate schema caps a deliverable at 120 chars — anything longer is
+  // extraction noise (a paragraph, not a component) and is dropped, not sent.
+  const usable = (deliverables || []).filter((d) => d && d.length <= 120).slice(0, 10);
+
   useEffect(() => {
     let cancelled = false;
-    api.post(`/api/tasks/${task.taskId}/milestones/generate`, {})
+    api.post(`/api/tasks/${task.taskId}/milestones/generate`, (
+      usable.length ? { deliverables: usable } : {}
+    ))
       .then((response) => {
         if (cancelled) return;
         setRows(response.data.proposed);

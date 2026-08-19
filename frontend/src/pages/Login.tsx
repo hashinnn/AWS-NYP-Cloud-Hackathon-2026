@@ -30,15 +30,72 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-6">
-      <form onSubmit={submit} className="w-full max-w-sm rounded-card border border-hairline bg-surface p-6">
-        <span className="flex items-center gap-2 font-semibold tracking-tight text-ink">
-          <span className="grid size-6 place-items-center rounded-md bg-ink text-[11px] font-bold text-plane">
-            dIQ
+    <div className="flex min-h-screen">
+      {/* ── the argument, before the form ─────────────────────────────────
+          The five bars ARE the product: a deterministic formula a judge can
+          check by hand. The sign-in screen leads with that, not with fields. */}
+      <div className="relative hidden flex-1 flex-col justify-between overflow-hidden bg-ink p-10 text-plane lg:flex">
+        <span className="flex items-center gap-2.5">
+          <span className="grid size-8 place-items-center rounded-[10px] border border-plane/25">
+            <svg viewBox="0 0 24 24" className="size-5" aria-hidden="true">
+              <g fill="currentColor">
+                <rect x="4" y="13" width="2.6" height="7" rx="1.3" />
+                <rect x="8.2" y="9.5" width="2.6" height="10.5" rx="1.3" />
+                <rect x="12.4" y="6" width="2.6" height="14" rx="1.3" />
+                <rect x="16.6" y="10.5" width="2.6" height="9.5" rx="1.3" />
+              </g>
+            </svg>
           </span>
-          DeadlineIQ
+          <span className="display text-[19px]">DeadlineIQ</span>
         </span>
-        <h1 className="mt-5 text-lg font-semibold text-ink">Sign in</h1>
+
+        <div className="max-w-md">
+          <h2 className="display text-[44px] leading-[1.08]">
+            Know what to do next — and exactly why.
+          </h2>
+          <p className="mt-5 text-[15px] leading-relaxed text-plane/70">
+            Five factors, one arithmetic you can check on a whiteboard. The AI writes the
+            sentence. It never picks the order.
+          </p>
+
+          {/* A worked sub-score bar, as the visual signature. */}
+          <div className="mt-8">
+            <div className="flex h-3 w-full gap-[3px] overflow-hidden rounded-[4px]" aria-hidden="true">
+              {[
+                ['var(--color-series-1)', 30], ['var(--color-series-2)', 25],
+                ['var(--color-series-3)', 20], ['var(--color-series-4)', 15],
+                ['var(--color-series-5)', 10],
+              ].map(([colour, width]) => (
+                <span key={colour as string} style={{ backgroundColor: colour as string, width: `${width}%` }} />
+              ))}
+            </div>
+            <p className="num mt-2.5 text-xs tracking-wide text-plane/60">
+              0.30·Urgency + 0.25·Stakes + 0.20·Effort + 0.15·Deficit + 0.10·Clash
+            </p>
+          </div>
+        </div>
+
+        <p className="text-xs text-plane/50">AWS × NYP Cloud Hackathon 2026 · PS-3</p>
+      </div>
+
+      {/* ── the form ── */}
+      <div className="flex flex-1 items-center justify-center px-6">
+        <form onSubmit={submit} className="w-full max-w-sm">
+          <span className="flex items-center gap-2.5 lg:hidden">
+            <span className="grid size-8 place-items-center rounded-[10px] bg-ink">
+              <svg viewBox="0 0 24 24" className="size-5" aria-hidden="true">
+                <g fill="var(--color-plane)">
+                  <rect x="4" y="13" width="2.6" height="7" rx="1.3" />
+                  <rect x="8.2" y="9.5" width="2.6" height="10.5" rx="1.3" />
+                  <rect x="12.4" y="6" width="2.6" height="14" rx="1.3" />
+                  <rect x="16.6" y="10.5" width="2.6" height="9.5" rx="1.3" />
+                </g>
+              </svg>
+            </span>
+            <span className="display text-[19px] text-ink">DeadlineIQ</span>
+          </span>
+          <h1 className="display mt-6 text-[30px] text-ink lg:mt-0">Welcome back</h1>
+          <p className="mt-1 text-sm text-muted">Your ranking recomputed while you were away.</p>
 
         <label className="mt-4 block text-sm text-ink2" htmlFor="email">Email</label>
         <input
@@ -70,11 +127,12 @@ export default function Login() {
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
 
-        <p className="mt-4 text-center text-sm text-muted">
-          New here?{' '}
-          <Link to="/register" className="text-ink underline underline-offset-2">Create an account</Link>
-        </p>
-      </form>
+          <p className="mt-4 text-center text-sm text-muted">
+            New here?{' '}
+            <Link to="/register" className="text-ink underline underline-offset-2">Create an account</Link>
+          </p>
+        </form>
+      </div>
     </div>
   );
 }

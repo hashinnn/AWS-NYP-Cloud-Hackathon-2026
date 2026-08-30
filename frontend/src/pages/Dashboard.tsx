@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, errorMessage } from '../lib/api';
 import { openCapture } from '../lib/capture';
+import { useAuth } from '../context/AuthContext';
 import { useTasks } from '../context/TasksContext';
 import { formatHours } from '../lib/countdown';
 import { capacityColour } from '../lib/chartTheme';
@@ -34,7 +35,14 @@ const SORTS = [
 
 const FILTER_KEY = 'deadlineiq.dashboard.filters';
 
+/** "tom lee" → "Tom". A greeting uses the name people call you, not the record. */
+function firstName(displayName?: string) {
+  const first = (displayName || '').trim().split(/\s+/)[0];
+  return first ? first[0].toUpperCase() + first.slice(1) : '';
+}
+
 export default function Dashboard() {
+  const { user } = useAuth();
   const { refresh: refreshRanking, ranking: cachedRanking } = useTasks();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -149,7 +157,14 @@ export default function Dashboard() {
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <h1 className="display text-[26px] leading-tight text-ink">Dashboard</h1>
+          {/* The name is already in the session from UC-001; "back" is only
+              true once there is something to come back to. Falls back to the
+              page name while /users/me is still in flight. */}
+          <h1 className="display text-[26px] leading-tight text-ink">
+            {firstName(user?.displayName)
+              ? `${ranking.length === 0 ? 'Welcome' : 'Welcome back'}, ${firstName(user.displayName)}`
+              : 'Dashboard'}
+          </h1>
           <p className="mt-0.5 text-sm text-muted">
             {new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>

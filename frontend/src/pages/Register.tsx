@@ -41,7 +41,7 @@ export default function Register() {
     setTaken(false);
     try {
       await register(displayName, email, password);
-      navigate('/focus');
+      navigate('/dashboard');
     } catch (error) {
       // E1 — the message is safe to show verbatim; the code is what we branch on.
       setTaken(errorCode(error) === 'email_exists');

@@ -21,7 +21,11 @@ export default function Login() {
     setProblem(null);
     try {
       await login(email, password);
-      navigate(sessionStorage.getItem('deadlineiq.returnTo') || '/focus');
+      // Consumed, not kept: otherwise one expired session on /workload sends
+      // every later sign-in back to /workload.
+      const returnTo = sessionStorage.getItem('deadlineiq.returnTo');
+      sessionStorage.removeItem('deadlineiq.returnTo');
+      navigate(returnTo || '/dashboard');
     } catch (error) {
       setProblem(errorMessage(error, 'Could not sign in.'));
     } finally {

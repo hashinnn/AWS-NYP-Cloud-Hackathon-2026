@@ -33,7 +33,6 @@ import CharacterWidget from './components/CharacterWidget';
 import QuickAddBar, { focusQuickAdd } from './components/QuickAddBar';
 import BulkImportDialog from './components/BulkImportDialog';
 import BriefUploadDialog from './components/BriefUploadDialog';
-import { getToken } from './lib/api';
 
 /**
  * The nav, grouped by intent rather than flattened into one row: what needs
@@ -393,7 +392,11 @@ function Shell({ children }) {
 }
 
 function Protected({ children }) {
-  if (!getToken()) return <Navigate to="/login" replace />;
+  // Read auth from context, not localStorage: a bare getToken() call does not
+  // subscribe to anything, so sign-out cleared the token without re-rendering
+  // here and the redirect below never fired.
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <Shell>{children}</Shell>;
 }
 

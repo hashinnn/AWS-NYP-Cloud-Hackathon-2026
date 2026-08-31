@@ -74,6 +74,17 @@ exports.handler = async (event) => {
       // The sparse index mirrors the deadline; a dueAt written without it
       // would leave the task sorted under its old date in every GSI1 query.
       changes.GSI1SK = `DUE#${dueAt}`;
+
+      // Moving an overdue deadline into the future is a reschedule (UC-021
+      // step 4), so the task stops being overdue. Without this it keeps the
+      // badge forever: newlyOverdue() only transitions active → overdue, so
+      // the hourly recompute never walks it back.
+      if (task.status === 'overdue'
+        && !('status' in body)
+        && Date.parse(dueAt) > Date.parse(now)) {
+        recordChange('status', task.status, 'active');
+        changes.overdueSince = null;
+      }
     }
   }
 

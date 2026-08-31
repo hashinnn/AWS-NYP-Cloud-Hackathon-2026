@@ -99,7 +99,7 @@ Globals:
     Architectures: [arm64]
     MemorySize: 256
     Timeout: 10
-    CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-bfkeqsk34fnp/fb047d8098d7ff175b2164e733751246
+    CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-bfkeqsk34fnp/deadlineiq-backend-v2.zip
     Environment:
       Variables:
         TABLE_NAME: !Ref TableName

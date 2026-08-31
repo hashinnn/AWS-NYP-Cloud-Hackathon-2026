@@ -4,7 +4,12 @@
 
 Built for the **AWS × NYP Cloud Hackathon 2026** — Problem Statement **PS-3: Assignment Deadline Tracker**.
 
-**Live:** [d3c6ivdcez723d.cloudfront.net](https://d3c6ivdcez723d.cloudfront.net) · sign in as `demo@nyp.edu.sg` / `demo1234`
+**Live demo:** [d3c6ivdcez723d.cloudfront.net](https://d3c6ivdcez723d.cloudfront.net)
+
+| | |
+| --- | --- |
+| **Email** | `demo@nyp.edu.sg` |
+| **Password** | `demo1234` |
 
 ---
 

@@ -420,9 +420,9 @@ Reading order:
 
 | Member | Track | Owns |
 | --- | --- | --- |
+| **Hasini** | Cloud Deployment & Intelligence | **Deployed the entire system to AWS** — CloudFormation stacks, IAM execution role, S3 + CloudFront web tier, API Gateway CORS pipeline, EventBridge schedules, SNS, CloudWatch retention and cost guardrails; post-deployment fixes across the auth and task-edit paths. Then: the scoring engine, explanations, Focus Mode, milestones, crash-week detection, daily plan, weight tuning, workload heatmap, shared chart theme |
 | **Philena** | Platform & Data | SAM template, DynamoDB + GSI1, API Gateway, authoriser, auth, task CRUD, modules and availability, seed script |
 | **Mahdiya** | Smart Capture | S3 + presigned uploads, natural-language parser, brief extraction, bulk import, progress logging |
-| **Hasini** | Intelligence | The scoring engine, explanations, Focus Mode, milestones, crash-week detection, daily plan, weight tuning, workload heatmap |
 | **Zoe** | Experience & Notifications | Dashboard, calendar and timeline, EventBridge + reminder pipeline, notification preferences, overdue handling, completed view, calendar export |
 
 ---

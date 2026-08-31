@@ -1,0 +1,104 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  DeadlineIQ web tier — the built React app in a private S3 bucket, served
+  over HTTPS by CloudFront via Origin Access Control. Deployed as its own
+  stack so it never touches the shared backend template.
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: >
+      Globally unique S3 bucket name for the built frontend. Suffix it with
+      your account id to guarantee uniqueness.
+
+Resources:
+  # Private bucket. Nothing is publicly readable — CloudFront is the only
+  # principal allowed to GET, enforced by the bucket policy below.
+  WebBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # OAC replaces the legacy Origin Access Identity: CloudFront signs its
+  # origin requests with SigV4, so the bucket stays fully private.
+  WebOac:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${BucketName}-oac'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  WebDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: DeadlineIQ frontend
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        # Includes Asian edge locations; still inside the always-free 1 TB.
+        PriceClass: PriceClass_200
+        Origins:
+          - Id: web-s3-origin
+            DomainName: !GetAtt WebBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt WebOac.Id
+            # Required alongside OAC, and must be empty.
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+        DefaultCacheBehavior:
+          TargetOriginId: web-s3-origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          # Managed-CachingOptimized
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        # The app uses BrowserRouter, so /dashboard is not an S3 object.
+        # A private bucket answers a missing key with 403, not 404, so both
+        # are rewritten to the SPA shell and React Router resolves the path.
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+  WebBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowCloudFrontServicePrincipalReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub 'arn:aws:s3:::${BucketName}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${WebDistribution}'
+
+Outputs:
+  CloudFrontUrl:
+    Description: Public HTTPS URL of the app. This becomes FrontendUrl on the backend stack.
+    Value: !Sub 'https://${WebDistribution.DomainName}'
+  DistributionId:
+    Description: Needed to invalidate the cache after each frontend redeploy.
+    Value: !Ref WebDistribution
+  WebBucketName:
+    Description: Sync the Vite build output here.
+    Value: !Ref WebBucket
